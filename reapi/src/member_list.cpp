@@ -492,6 +492,7 @@ member_t memberlist_player[] = {
 	PL_MEMBERS(m_iLastAccount),
 	PL_MEMBERS(m_iLastClientHealth),
 	PL_MEMBERS(m_tmNextAccountHealthUpdate),
+	PL_MEMBERS(m_iBunnyHop)
 };
 
 member_t memberlist_entvars[] = {

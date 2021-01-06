@@ -473,6 +473,7 @@ enum CBasePlayer_Members
 	m_iLastAccount,
 	m_iLastClientHealth,
 	m_tmNextAccountHealthUpdate,
+	m_iBunnyHop
 };
 
 // entvars
