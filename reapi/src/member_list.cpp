@@ -492,7 +492,6 @@ member_t memberlist_player[] = {
 	PL_MEMBERS(m_iLastAccount),
 	PL_MEMBERS(m_iLastClientHealth),
 	PL_MEMBERS(m_tmNextAccountHealthUpdate),
-	PL_MEMBERS(m_iBunnyHop)
 };
 
 member_t memberlist_entvars[] = {
@@ -758,6 +757,7 @@ member_t memberlist_csplayer[] = {
 	CSPL_MEMBERS(m_iWeaponInfiniteAmmo),
 	CSPL_MEMBERS(m_iWeaponInfiniteIds),
 	CSPL_MEMBERS(m_bCanShootOverride),
+	CSPL_MEMBERS(m_iBunnyHop),
 };
 
 member_t memberlist_baseitem[] = {

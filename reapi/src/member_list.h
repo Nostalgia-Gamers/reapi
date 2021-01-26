@@ -473,7 +473,6 @@ enum CBasePlayer_Members
 	m_iLastAccount,
 	m_iLastClientHealth,
 	m_tmNextAccountHealthUpdate,
-	m_iBunnyHop
 };
 
 // entvars
@@ -747,6 +746,7 @@ enum CSPlayer_Members
 	m_iWeaponInfiniteAmmo,
 	m_iWeaponInfiniteIds,
 	m_bCanShootOverride,
+	m_iBunnyHop,
 };
 
 enum CBasePlayerItem_Members

@@ -116,6 +116,8 @@ public:
 	EProtectionState GetProtectionState() const;
 	bool CheckActivityInGame();
 
+	bool HasBunnyHop() const;
+
 public:
 	char m_szModel[32];
 	bool m_bForceShowMenu;
@@ -125,6 +127,7 @@ public:
 	int m_iWeaponInfiniteAmmo;
 	int m_iWeaponInfiniteIds;
 	bool m_bCanShootOverride;
+	BOOL m_iBunnyHop;
 };
 
 // Inlines

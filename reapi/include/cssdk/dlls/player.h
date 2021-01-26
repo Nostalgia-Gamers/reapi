@@ -599,7 +599,6 @@ public:
 	int m_iLastAccount;
 	int m_iLastClientHealth;
 	float m_tmNextAccountHealthUpdate;
-	BOOL m_iBunnyHop;
 };
 
 class CWShield: public CBaseEntity
