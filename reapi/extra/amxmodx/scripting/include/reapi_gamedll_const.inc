@@ -3617,14 +3617,6 @@ enum CBasePlayer_Members
 	* Set params:       set_member(index, member, Float:value);
 	*/
 	m_tmNextAccountHealthUpdate,
-
-	/*
-	* Description:		Ability to auto-jump on touching ground
-	* Member type:		BOOL
-	* Get params:		get_member(index, member);
-	* Set params:		set_member(index, member, value);
-	*/
-	m_iBunnyHop
 };
 
 /**
@@ -4559,6 +4551,14 @@ enum CCSPlayer_Members
 	* Set params:       set_member(index, member, bool:value);
 	*/
 	m_bCanShootOverride,
+
+	/*
+	* Description:		Ability to auto-jump on touching ground
+	* Member type:		BOOL
+	* Get params:		get_member(index, member);
+	* Set params:		set_member(index, member, value);
+	*/
+	m_iBunnyHop
 };
 
 /**
