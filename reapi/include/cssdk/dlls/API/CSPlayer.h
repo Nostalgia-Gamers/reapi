@@ -47,7 +47,9 @@ public:
 		m_flSpawnProtectionEndTime(0),
 		m_iWeaponInfiniteAmmo(0),
 		m_iWeaponInfiniteIds(0),
-		m_bCanShootOverride(false)
+		m_bCanShootOverride(false),
+		m_iNickChangesBeforeSpawn(0),
+		ArmorType m_iClientKevlar(ARMOR_NONE)
 	{
 		m_szModel[0] = '\0';
 	}
@@ -125,6 +127,8 @@ public:
 	int m_iWeaponInfiniteAmmo;
 	int m_iWeaponInfiniteIds;
 	bool m_bCanShootOverride;
+	int m_iNickChangesBeforeSpawn;
+	ArmorType m_iClientKevlar;
 };
 
 // Inlines
