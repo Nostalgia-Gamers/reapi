@@ -49,7 +49,7 @@ public:
 		m_iWeaponInfiniteIds(0),
 		m_bCanShootOverride(false),
 		m_iNickChangesBeforeSpawn(0),
-		ArmorType m_iClientKevlar(ARMOR_NONE)
+		m_iClientKevlar(ARMOR_NONE)
 	{
 		m_szModel[0] = '\0';
 	}
