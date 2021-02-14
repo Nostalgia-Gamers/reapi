@@ -424,6 +424,7 @@ public:
 	bool m_bResumeZoom;
 	float m_flEjectBrass;
 	ArmorType m_iKevlar;
+	ArmorType m_iClientKevlar;
 	bool m_bNotKilled;
 	TeamName m_iTeam;
 	int m_iAccount;
@@ -596,6 +597,7 @@ public:
 	float m_silentTimestamp;
 	MusicState m_musicState;
 	float m_flLastCommandTime[COMMANDS_TO_TRACK];
+	int m_iNickChangesBeforeSpawn;
 	int m_iLastAccount;
 	int m_iLastClientHealth;
 	float m_tmNextAccountHealthUpdate;
