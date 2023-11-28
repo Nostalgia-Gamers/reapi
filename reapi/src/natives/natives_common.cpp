@@ -114,6 +114,61 @@ cell AMX_NATIVE_CALL amx_get_viewent(AMX *amx, cell *params)
 }
 
 /*
+* Sets value string to entire buffer
+*
+* @param buffer     Pointer to buffer
+* @param value      Value to set
+* @param maxlen     Maximum size of the value buffer to set, -1 means copy all characters
+*
+* @return           1 on success, 0 otherwise
+*
+* native set_key_value_buffer(const pbuffer, const value[], const maxlen = -1);
+*/
+cell AMX_NATIVE_CALL amx_set_key_value_buffer(AMX *amx, cell *params)
+{
+	enum args_e { arg_count, arg_buffer, arg_value, arg_maxlen };
+
+	char *buffer = reinterpret_cast<char *>(params[arg_buffer]);
+	if (!buffer)
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: Invalid buffer", __FUNCTION__);
+		return FALSE;
+	}
+
+	size_t maxlen = (params[arg_maxlen] > 0) ? min(params[arg_maxlen], MAX_INFO_STRING) : MAX_INFO_STRING;
+	char infobuf[MAX_INFO_STRING];
+	const char *value = getAmxString(amx, params[arg_value], infobuf);
+	size_t len = min<size_t>(Q_strlen(value) + 1, maxlen);
+	Q_strnlcpy(buffer, value, len);
+	return TRUE;
+}
+
+/*
+* Gets an AMXX string buffer from a infobuffer pointer
+*
+* @param buffer     Info string pointer
+* @param value      String to copy value to
+* @param maxlen     Maximum size of the output buffer
+*
+* @return           Returns a string buffer on infobuffer pointer
+*
+* native get_key_value_buffer(const pbuffer, const output[], const maxlen);
+*/
+cell AMX_NATIVE_CALL amx_get_key_value_buffer(AMX *amx, cell *params)
+{
+	enum args_e { arg_count, arg_buffer, arg_output, arg_maxlen };
+
+	char *buffer = reinterpret_cast<char *>(params[arg_buffer]);
+	if (!buffer)
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: Invalid buffer", __FUNCTION__);
+		return FALSE;
+	}
+
+	return g_amxxapi.SetAmxString(amx, params[arg_output], buffer, params[arg_maxlen]);
+}
+
+/*
 * Gets value for key in buffer
 *
 * @param pbuffer    Pointer to buffer
@@ -236,7 +291,7 @@ cell AMX_NATIVE_CALL amx_GetBonePosition(AMX *amx, cell *params)
 */
 cell AMX_NATIVE_CALL amx_GetAttachment(AMX *amx, cell *params)
 {
-	enum args_e { arg_count, arg_index, arg_bone, arg_attachment, arg_angles };
+	enum args_e { arg_count, arg_index, arg_attachment, arg_origin, arg_angles };
 
 	CHECK_ISENTITY(arg_index);
 
@@ -251,10 +306,111 @@ cell AMX_NATIVE_CALL amx_GetAttachment(AMX *amx, cell *params)
 		return FALSE;
 	}
 
-	Vector *pVecOrigin = (Vector *)getAmxAddr(amx, params[arg_attachment]);
+	Vector *pVecOrigin = (Vector *)getAmxAddr(amx, params[arg_origin]);
 	Vector *pVecAngles = (PARAMS_COUNT == 4) ? (Vector *)getAmxAddr(amx, params[arg_angles]) : nullptr;
-	GetAttachment(pEntity, params[arg_bone], pVecOrigin, pVecAngles);
+	GetAttachment(pEntity, params[arg_attachment], pVecOrigin, pVecAngles);
 	return TRUE;
+}
+
+/*
+* Sets body group value based on entity's model group
+*
+* @param entity     Entity index
+* @param group      Number of entity's model group index
+* @param value      Value to assign
+*
+* @return           1 on success, 0 otherwise
+* @error            If the index is not within the range of 1 to maxEntities or
+*                   the entity is not valid, an error will be thrown.
+*      
+*/ 
+cell AMX_NATIVE_CALL amx_GetBodygroup(AMX *amx, cell *params)
+{
+	enum args_e { arg_count, arg_index, arg_group };
+
+	CHECK_ISENTITY(arg_index);
+
+	CBaseEntity *pEntity = getPrivate<CBaseEntity>(params[arg_index]);
+	if (unlikely(pEntity == nullptr)) {
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized entity", __FUNCTION__);
+		return 0;
+	}
+
+	if (FNullEnt(params[arg_index])) {
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: worldspawn not allowed", __FUNCTION__);
+		return 0;
+	}
+
+	return (cell)GetBodygroup(pEntity, params[arg_group]);
+}
+
+/*
+* Gets body group value based on entity's model group
+*
+* @param entity     Entity index
+* @param group      Number of entity's model group index
+*
+* @return           Body group value
+* @error            If the index is not within the range of 1 to maxEntities or
+*                   the entity is not valid, an error will be thrown.
+*      
+*/ 
+cell AMX_NATIVE_CALL amx_SetBodygroup(AMX *amx, cell *params)
+{
+	enum args_e { arg_count, arg_index, arg_group, arg_value };
+
+	CHECK_ISENTITY(arg_index);
+
+	CBaseEntity *pEntity = getPrivate<CBaseEntity>(params[arg_index]);
+	if (unlikely(pEntity == nullptr)) {
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized entity", __FUNCTION__);
+		return FALSE;
+	}
+
+	if (FNullEnt(params[arg_index])) {
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: worldspawn not allowed", __FUNCTION__);
+		return FALSE;
+	}
+
+	SetBodygroup(pEntity, params[arg_group], params[arg_value]);
+	return TRUE;
+}
+
+/*
+* Gets sequence information based on entity's model current sequence index
+*
+* @param entity             Entity index
+* @param piFlags            Sequence flags (1 = sequence loops)
+* @param pflFrameRate       Sequence framerate
+* @param pflGroundSpeed     Sequence ground speed
+*
+* @return                   True on success, false otherwise
+* @error                    If the index is not within the range of 1 to maxEntities or
+*                           the entity is not valid, an error will be thrown.
+*      
+*/ 
+cell AMX_NATIVE_CALL amx_GetSequenceInfo(AMX *amx, cell *params)
+{
+	enum args_e { arg_count, arg_index, arg_flags, arg_framerate, arg_groundspeed };
+
+	CHECK_ISENTITY(arg_index);
+
+	CBaseEntity *pEntity = getPrivate<CBaseEntity>(params[arg_index]);
+	if (unlikely(pEntity == nullptr)) {
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized entity", __FUNCTION__);
+		return FALSE;
+	}
+
+	if (FNullEnt(params[arg_index])) {
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: worldspawn not allowed", __FUNCTION__);
+		return FALSE;
+	}
+
+	int* pflags = reinterpret_cast<int*>(getAmxAddr(amx, params[arg_flags]));
+	float* pframerate = reinterpret_cast<float*>(getAmxAddr(amx, params[arg_framerate]));
+	float* pgroundspeed = reinterpret_cast<float*>(getAmxAddr(amx, params[arg_groundspeed]));
+
+	return (cell)GetSequenceInfo2(pEntity, pflags, pframerate, pgroundspeed);
 }
 
 /*
@@ -287,7 +443,7 @@ cell AMX_NATIVE_CALL amx_SetThink(AMX *amx, cell *params)
 	char namebuf[256];
 	const char *funcname = getAmxString(amx, params[arg_handler], namebuf);
 	if (unlikely(funcname == nullptr || funcname[0] == '\0')) {
-		pEntity->SetThink(nullptr);
+		EntityCallbackDispatcher().UnsetThink(amx, pEntity);
 		return TRUE;
 	}
 
@@ -298,7 +454,7 @@ cell AMX_NATIVE_CALL amx_SetThink(AMX *amx, cell *params)
 	}
 
 	cell *pParams = (PARAMS_COUNT >= 3) ? getAmxAddr(amx, params[arg_params]) : nullptr;
-	return (cell)g_entCallback.SetThink(amx, pEntity, funcname, pParams, params[arg_len]);
+	return (cell)EntityCallbackDispatcher().SetThink(amx, pEntity, funcname, pParams, params[arg_len]);
 }
 
 /*
@@ -331,7 +487,7 @@ cell AMX_NATIVE_CALL amx_SetTouch(AMX *amx, cell *params)
 	char namebuf[256];
 	const char *funcname = getAmxString(amx, params[arg_handler], namebuf);
 	if (unlikely(funcname == nullptr || funcname[0] == '\0')) {
-		pEntity->SetTouch(nullptr);
+		EntityCallbackDispatcher().UnsetTouch(amx, pEntity);
 		return TRUE;
 	}
 
@@ -342,7 +498,7 @@ cell AMX_NATIVE_CALL amx_SetTouch(AMX *amx, cell *params)
 	}
 
 	cell *pParams = (PARAMS_COUNT >= 3) ? getAmxAddr(amx, params[arg_params]) : nullptr;
-	return (cell)g_entCallback.SetTouch(amx, pEntity, funcname, pParams, params[arg_len]);
+	return (cell)EntityCallbackDispatcher().SetTouch(amx, pEntity, funcname, pParams, params[arg_len]);
 }
 
 /*
@@ -375,7 +531,7 @@ cell AMX_NATIVE_CALL amx_SetUse(AMX *amx, cell *params)
 	char namebuf[256];
 	const char *funcname = getAmxString(amx, params[arg_handler], namebuf);
 	if (unlikely(funcname == nullptr || funcname[0] == '\0')) {
-		pEntity->SetUse(nullptr);
+		EntityCallbackDispatcher().UnsetUse(amx, pEntity);
 		return TRUE;
 	}
 
@@ -386,7 +542,7 @@ cell AMX_NATIVE_CALL amx_SetUse(AMX *amx, cell *params)
 	}
 
 	cell *pParams = (PARAMS_COUNT >= 3) ? getAmxAddr(amx, params[arg_params]) : nullptr;
-	return (cell)g_entCallback.SetUse(amx, pEntity, funcname, pParams, params[arg_len]);
+	return (cell)EntityCallbackDispatcher().SetUse(amx, pEntity, funcname, pParams, params[arg_len]);
 }
 
 /*
@@ -419,7 +575,7 @@ cell AMX_NATIVE_CALL amx_SetBlocked(AMX *amx, cell *params)
 	char namebuf[256];
 	const char *funcname = getAmxString(amx, params[arg_handler], namebuf);
 	if (unlikely(funcname == nullptr || funcname[0] == '\0')) {
-		pEntity->SetBlocked(nullptr);
+		EntityCallbackDispatcher().UnsetBlocked(amx, pEntity);
 		return TRUE;
 	}
 
@@ -430,7 +586,7 @@ cell AMX_NATIVE_CALL amx_SetBlocked(AMX *amx, cell *params)
 	}
 
 	cell *pParams = (PARAMS_COUNT >= 3) ? getAmxAddr(amx, params[arg_params]) : nullptr;
-	return (cell)g_entCallback.SetBlocked(amx, pEntity, funcname, pParams, params[arg_len]);
+	return (cell)EntityCallbackDispatcher().SetBlocked(amx, pEntity, funcname, pParams, params[arg_len]);
 }
 
 /*
@@ -464,7 +620,7 @@ cell AMX_NATIVE_CALL amx_SetMoveDone(AMX *amx, cell *params)
 	char namebuf[256];
 	const char *funcname = getAmxString(amx, params[arg_handler], namebuf);
 	if (unlikely(funcname == nullptr || funcname[0] == '\0')) {
-		((CBaseToggle *)pEntity)->SetMoveDone(nullptr);
+		EntityCallbackDispatcher().UnsetMoveDone(amx, pEntity);
 		return TRUE;
 	}
 
@@ -475,24 +631,29 @@ cell AMX_NATIVE_CALL amx_SetMoveDone(AMX *amx, cell *params)
 	}
 
 	cell *pParams = (PARAMS_COUNT >= 3) ? getAmxAddr(amx, params[arg_params]) : nullptr;
-	return (cell)g_entCallback.SetMoveDone(amx, pEntity, funcname, pParams, params[arg_len]);
+	return (cell)EntityCallbackDispatcher().SetMoveDone(amx, pEntity, funcname, pParams, params[arg_len]);
 }
 
 AMX_NATIVE_INFO Natives_Common[] =
 {
-	{ "FClassnameIs",    amx_FClassnameIs    },
-	{ "GetGrenadeType",  amx_GetGrenadeType  },
-	{ "engset_view",     amx_engset_view     },
-	{ "get_viewent",     amx_get_viewent     },
-	{ "get_key_value",   amx_get_key_value   },
-	{ "set_key_value",   amx_set_key_value   },
-	{ "GetBonePosition", amx_GetBonePosition },
-	{ "GetAttachment",   amx_GetAttachment   },
-	{ "SetThink",        amx_SetThink        },
-	{ "SetTouch",        amx_SetTouch        },
-	{ "SetUse",          amx_SetUse          },
-	{ "SetBlocked",      amx_SetBlocked      },
-	{ "SetMoveDone",     amx_SetMoveDone     },
+	{ "FClassnameIs",         amx_FClassnameIs         },
+	{ "GetGrenadeType",       amx_GetGrenadeType       },
+	{ "engset_view",          amx_engset_view          },
+	{ "get_viewent",          amx_get_viewent          },
+	{ "get_key_value",        amx_get_key_value        },
+	{ "set_key_value",        amx_set_key_value        },
+	{ "get_key_value_buffer", amx_get_key_value_buffer },
+	{ "set_key_value_buffer", amx_set_key_value_buffer },
+	{ "GetBonePosition",      amx_GetBonePosition      },
+	{ "GetAttachment",        amx_GetAttachment        },
+	{ "GetBodygroup",         amx_GetBodygroup         },
+	{ "SetBodygroup",         amx_SetBodygroup         },
+	{ "GetSequenceInfo",      amx_GetSequenceInfo      },
+	{ "SetThink",             amx_SetThink             },
+	{ "SetTouch",             amx_SetTouch             },
+	{ "SetUse",               amx_SetUse               },
+	{ "SetBlocked",           amx_SetBlocked           },
+	{ "SetMoveDone",          amx_SetMoveDone          },
 
 	{ nullptr, nullptr }
 };

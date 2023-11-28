@@ -83,6 +83,8 @@ struct memberlist_t
 		mt_mapinfo,
 		mt_csplayerweapon,
 		mt_gib,
+		mt_netadr,
+		mt_csentity
 	};
 };
 
@@ -735,6 +737,13 @@ enum PMTrace
 	pmt_hitgroup
 };
 
+enum NetAdr
+{
+	netadr_type = BEGIN_MEMBER_REGION(netadr),
+	netadr_ip,
+	netadr_port
+};
+
 // CCSPlayer
 enum CSPlayer_Members
 {
@@ -749,6 +758,14 @@ enum CSPlayer_Members
 	m_bGameForcingRespawn,
 	m_bAutoBunnyHopping,
 	m_bMegaBunnyJumping,
+	m_bPlantC4Anywhere,
+	m_bSpawnProtectionEffects,
+	m_flJumpHeight,
+	m_flLongJumpHeight,
+	m_flLongJumpForce,
+	m_flDuckSpeedMultiplier,
+	m_iNumKilledByUnanswered,
+	m_bPlayerDominated,
 };
 
 enum CBasePlayerItem_Members
@@ -1023,6 +1040,7 @@ enum CKnife_Members
 	m_Knife_flSwingBaseDamage_Fast,
 	m_Knife_flStabDistance,
 	m_Knife_flSwingDistance,
+	m_Knife_flBackStabMultiplier,
 };
 
 enum CP90_Members
@@ -1060,7 +1078,7 @@ enum MapInfo_Members
 
 enum CSPlayerWeapon_Members
 {
-	m_Weapon_bHasSecondaryAttack = BEGIN_MEMBER_REGION(csplayerweapon),
+	m_Weapon_iStateSecondaryAttack = BEGIN_MEMBER_REGION(csplayerweapon),
 	m_Weapon_flBaseDamage,
 };
 
@@ -1070,4 +1088,10 @@ enum CGib_Members
 	m_Gib_cBloodDecals,
 	m_Gib_material,
 	m_Gib_lifeTime,
+};
+
+enum CSEntity_Members
+{
+	m_ucDmgPenetrationLevel = BEGIN_MEMBER_REGION(csentity),
+	m_pevLastInflictor,
 };

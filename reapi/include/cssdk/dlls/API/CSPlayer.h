@@ -30,6 +30,7 @@
 
 #include <API/CSPlayerItem.h>
 #include <API/CSPlayerWeapon.h>
+#include <utlarray.h>
 
 enum WeaponInfiniteAmmoMode
 {
@@ -50,9 +51,23 @@ public:
 		m_bCanShootOverride(false),
 		m_bGameForcingRespawn(false),
 		m_bAutoBunnyHopping(false),
-		m_bMegaBunnyJumping(false)
+		m_bMegaBunnyJumping(false),
+		m_bPlantC4Anywhere(false),
+		m_bSpawnProtectionEffects(false),
+		m_flJumpHeight(0),
+		m_flLongJumpHeight(0),
+		m_flLongJumpForce(0),
+		m_flDuckSpeedMultiplier(0),
+		m_iUserID(-1)
 	{
 		m_szModel[0] = '\0';
+
+		// Resets the kill history for this player
+		for (int i = 0; i < MAX_CLIENTS; i++)
+		{
+			m_iNumKilledByUnanswered[i] = 0;
+			m_bPlayerDominated[i]       = false;
+		}
 	}
 
 	virtual bool IsConnected() const = 0;
@@ -62,8 +77,8 @@ public:
 	virtual CBaseEntity *GiveNamedItemEx(const char *pszName) = 0;
 	virtual void GiveDefaultItems() = 0;
 	virtual void GiveShield(bool bDeploy = true) = 0;
-	virtual void DropShield(bool bDeploy = true) = 0;
-	virtual void DropPlayerItem(const char *pszItemName) = 0;
+	virtual CBaseEntity *DropShield(bool bDeploy = true) = 0;
+	virtual CBaseEntity *DropPlayerItem(const char *pszItemName) = 0;
 	virtual bool RemoveShield() = 0;
 	virtual void RemoveAllItems(bool bRemoveSuit) = 0;
 	virtual bool RemovePlayerItem(const char* pszItemName) = 0;
@@ -100,11 +115,9 @@ public:
 	virtual void SetSpawnProtection(float flProtectionTime) = 0;
 	virtual void RemoveSpawnProtection() = 0;
 	virtual bool HintMessageEx(const char *pMessage, float duration = 6.0f, bool bDisplayIfPlayerDead = false, bool bOverride = false) = 0;
-
-	void Reset();
-
-	void OnSpawn();
-	void OnKilled();
+	virtual void Reset() = 0;
+	virtual void OnSpawnEquip(bool addDefault = true, bool equipGame = true) = 0;
+	virtual void SetScoreboardAttributes(CBasePlayer *destination = nullptr) = 0;
 
 	CBasePlayer *BasePlayer() const;
 
@@ -131,6 +144,25 @@ public:
 	bool m_bGameForcingRespawn;
 	bool m_bAutoBunnyHopping;
 	bool m_bMegaBunnyJumping;
+	bool m_bPlantC4Anywhere;
+	bool m_bSpawnProtectionEffects;
+	double m_flJumpHeight;
+	double m_flLongJumpHeight;
+	double m_flLongJumpForce;
+	double m_flDuckSpeedMultiplier;
+
+	int m_iUserID;
+	struct CDamageRecord_t
+	{
+		float flDamage            = 0.0f;
+		float flFlashDurationTime = 0.0f;
+		int userId                = -1;
+	};
+	using DamageList_t = CUtlArray<CDamageRecord_t, MAX_CLIENTS>;
+	DamageList_t m_DamageList; // A unified array of recorded damage that includes giver and taker in each entry
+	DamageList_t &GetDamageList() { return m_DamageList; }
+	int m_iNumKilledByUnanswered[MAX_CLIENTS]; // [0-31] how many unanswered kills this player has been dealt by each other player
+	bool m_bPlayerDominated[MAX_CLIENTS]; // [0-31] array of state per other player whether player is dominating other players
 };
 
 // Inlines

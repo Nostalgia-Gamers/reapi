@@ -542,8 +542,9 @@ cell AMX_NATIVE_CALL rg_update_teamscores(AMX *amx, cell *params)
 *
 * @param classname      Entity classname
 * @param useHashTable   Use this only for known game entities
-*
-* @note: Do not use this if you use a custom classname
+* @note: Do not use this if you plan to change custom classname an entity after creation,
+*        otherwise it will never be release from hash table even if an entity was destroyed,
+*        and that to lead table to inflate/memory leaks
 *
 * @return               Index of the created entity or 0 otherwise
 *
@@ -752,6 +753,8 @@ cell AMX_NATIVE_CALL rg_has_item_by_name(AMX *amx, cell *params)
 * @param weapon name or id      Weapon id, see WEAPON_* constants, WeaponIdType or weapon_* name
 * @param WpnInfo:type           Info type, see WI_* constants
 *
+* @note weapon_* name can only be used to get WI_ID
+*
 * @return                       Weapon information
 * @error                        If weapon_id or type are out of bounds, an error will be thrown
 *
@@ -902,58 +905,35 @@ cell AMX_NATIVE_CALL rg_set_weapon_info(AMX *amx, cell *params)
 /*
 * Remove all the player's stuff in a specific slot.
 *
-* @param index  Client index
-* @param slot   The slot that will be emptied
+* @param index          Client index
+* @param slot           The slot that will be emptied
+* @param removeAmmo     Remove ammunition
 *
-* @return       1 on success, 0 otherwise
+* @return               1 - successful removal of all items in the slot or the slot is empty
+*                       0 - if at least one item failed to remove
 *
-* native rg_remove_items_by_slot(const index, const InventorySlotType:slot);
+* native rg_remove_items_by_slot(const index, const InventorySlotType:slot, const bool:removeAmmo = true);
 */
 cell AMX_NATIVE_CALL rg_remove_items_by_slot(AMX *amx, cell *params)
 {
-	enum args_e { arg_count, arg_index, arg_slot };
+	enum args_e { arg_count, arg_index, arg_slot, arg_remammo };
 
 	CHECK_ISPLAYER(arg_index);
 
 	CBasePlayer *pPlayer = UTIL_PlayerByIndex(params[arg_index]);
 	CHECK_CONNECTED(pPlayer, arg_index);
 
-	if (params[arg_slot] == C4_SLOT)
+	bool success = true;
+
+	pPlayer->ForEachItem(params[arg_slot], [&](CBasePlayerItem *pItem)
 	{
-		pPlayer->CSPlayer()->RemovePlayerItemEx("weapon_c4", true);
-	}
-	else
-	{
-		pPlayer->ForEachItem(params[arg_slot], [pPlayer](CBasePlayerItem *pItem)
-		{
-			if (pItem->IsWeapon()) {
-				if (pItem == pPlayer->m_pActiveItem) {
-					((CBasePlayerWeapon *)pItem)->RetireWeapon();
-				}
+		// Compatible with older versions of the plugin,
+		// which still only pass two parameters
+		success &= pPlayer->CSPlayer()->RemovePlayerItemEx(STRING(pItem->pev->classname), (PARAMS_COUNT < 3 || params[arg_remammo] != 0)) ? true : false;
+		return false;
+	});
 
-				pPlayer->m_rgAmmo[ pItem->PrimaryAmmoIndex() ] = 0;
-			}
-
-			if (pPlayer->RemovePlayerItem(pItem)) {
-				pPlayer->pev->weapons &= ~(1 << pItem->m_iId);
-
-				// No more weapon
-				if ((pPlayer->pev->weapons & ~(1 << WEAPON_SUIT)) == 0) {
-					pPlayer->m_iHideHUD |= HIDEHUD_WEAPONS;
-				}
-
-				pItem->Kill();
-			}
-
-			return false;
-		});
-
-		if (!pPlayer->m_rgpPlayerItems[PRIMARY_WEAPON_SLOT]) {
-			pPlayer->m_bHasPrimary = false;
-		}
-	}
-
-	return TRUE;
+	return success ? TRUE : FALSE;
 }
 
 /*
@@ -962,7 +942,8 @@ cell AMX_NATIVE_CALL rg_remove_items_by_slot(AMX *amx, cell *params)
 * @param index      Client index
 * @param slot       Specific slot for remove of each item.
 *
-* @return           1 on success, 0 otherwise
+* @return           1 - successful drop of all items in the slot or the slot is empty
+*                   0 - if at least one item failed to drop
 *
 * native rg_drop_items_by_slot(const index, const InventorySlotType:slot);
 */
@@ -975,12 +956,14 @@ cell AMX_NATIVE_CALL rg_drop_items_by_slot(AMX *amx, cell *params)
 	CBasePlayer *pPlayer = UTIL_PlayerByIndex(params[arg_index]);
 	CHECK_CONNECTED(pPlayer, arg_index);
 
-	pPlayer->ForEachItem(params[arg_slot], [pPlayer](CBasePlayerItem *pItem) {
-		pPlayer->CSPlayer()->DropPlayerItem(STRING(pItem->pev->classname));
+	bool success = true;
+
+	pPlayer->ForEachItem(params[arg_slot], [&](CBasePlayerItem *pItem) {
+		success &= pPlayer->CSPlayer()->DropPlayerItem(STRING(pItem->pev->classname)) ? true : false;
 		return false;
 	});
 
-	return TRUE;
+	return success ? TRUE : FALSE;
 }
 
 /*
@@ -1010,9 +993,9 @@ cell AMX_NATIVE_CALL rg_remove_all_items(AMX *amx, cell *params)
 * Forces the player to drop the specified item classname.
 *
 * @param index      Client index
-* @param item_name  Item classname
+* @param item_name  Item classname, if no name, the active item classname
 *
-* @return           1 on success, 0 otherwise
+* @return           Entity index of weaponbox, AMX_NULLENT (-1) otherwise
 *
 * native rg_drop_item(const index, const item_name[]);
 */
@@ -1026,8 +1009,12 @@ cell AMX_NATIVE_CALL rg_drop_item(AMX *amx, cell *params)
 	CHECK_CONNECTED(pPlayer, arg_index);
 
 	char item[256];
-	pPlayer->CSPlayer()->DropPlayerItem(getAmxString(amx, params[arg_item_name], item));
-	return TRUE;
+	auto pEntity = pPlayer->CSPlayer()->DropPlayerItem(getAmxString(amx, params[arg_item_name], item));
+
+	if (pEntity)
+		return indexOfPDataAmx(pEntity);
+
+	return AMX_NULLENT;
 }
 
 /*
@@ -1255,6 +1242,10 @@ cell AMX_NATIVE_CALL rg_give_defusekit(AMX *amx, cell *params)
 
 	// on the map there is not bomb places
 	if (CSGameRules() != nullptr && !CSGameRules()->m_bMapHasBombTarget && !CSGameRules()->m_bMapHasBombZone) {
+		return FALSE;
+	}
+
+	if (pPlayer->m_iTeam != CT) {
 		return FALSE;
 	}
 
@@ -1584,10 +1575,11 @@ cell AMX_NATIVE_CALL rg_get_user_footsteps(AMX *amx, cell *params)
 * @param index      Client index
 * @param receiver   Receiver index, if 0 it will transfer to a random player
 *
-* @return           1 on success, 0 otherwise
+* @return           Index of player entity if successfull, 0 otherwise
 *
 * native rg_transfer_c4(const index, const receiver = 0);
 */
+
 cell AMX_NATIVE_CALL rg_transfer_c4(AMX *amx, cell *params)
 {
 	enum args_e { arg_count, arg_index, arg_receiver };
@@ -1598,29 +1590,50 @@ cell AMX_NATIVE_CALL rg_transfer_c4(AMX *amx, cell *params)
 	CBasePlayer *pPlayer = UTIL_PlayerByIndex(params[arg_index]);
 	CHECK_CONNECTED(pPlayer, arg_index);
 
-	if (!pPlayer->m_bHasC4 || !pPlayer->CSPlayer()->RemovePlayerItem("weapon_c4"))
+	if (!pPlayer->m_bHasC4) {
 		return FALSE;
+	}
 
-	pPlayer->pev->body = 0;
-	pPlayer->m_bHasC4 = false;
-	pPlayer->CSPlayer()->SetBombIcon();
-	pPlayer->CSPlayer()->SetProgressBarTime(0);
+	CBasePlayer *pReceiver = nullptr;
 
-	if (params[arg_receiver] != 0 && params[arg_receiver] <= gpGlobals->maxClients) {
-		CBasePlayer *pReceiver = UTIL_PlayerByIndex(params[arg_receiver]);
+	if (params[arg_receiver] > 0 && params[arg_receiver] <= gpGlobals->maxClients) {
+		pReceiver = UTIL_PlayerByIndex(params[arg_receiver]);
 		CHECK_CONNECTED(pReceiver, arg_receiver);
 
-		if (!pReceiver->CSPlayer()->MakeBomber())
+		if (!pPlayer->CSPlayer()->RemovePlayerItemEx("weapon_c4", true)) {
 			return FALSE;
+		}
 
-	} else {
+		if (!pReceiver->CSPlayer()->MakeBomber()) {
+			return FALSE;
+		}
+	}
+	else {
+		int NumDeadCT, NumDeadTerrorist, NumAliveTerrorist, NumAliveCT;
+		CSGameRules()->InitializePlayerCounts(NumAliveTerrorist, NumAliveCT, NumDeadTerrorist, NumDeadCT);
+
+		if (pPlayer->m_iTeam == CT && NumAliveTerrorist < 1) {
+			return FALSE;
+		}
+
+		if (pPlayer->m_iTeam == TERRORIST && NumAliveTerrorist < 2) {
+			return FALSE;
+		}
+
+		if (!pPlayer->CSPlayer()->RemovePlayerItemEx("weapon_c4", true)) {
+			return FALSE;
+		}
+
 		auto flags = pPlayer->pev->flags;
 		pPlayer->pev->flags |= FL_DORMANT;
-		CSGameRules()->GiveC4();
+		pReceiver = CSGameRules()->GiveC4();
 		pPlayer->pev->flags = flags;
 	}
 
-	return TRUE;
+	if (pReceiver)
+		return indexOfPDataAmx(pReceiver);
+
+	return FALSE;
 }
 
 /*
@@ -2023,7 +2036,7 @@ cell AMX_NATIVE_CALL rg_send_bartime(AMX *amx, cell *params)
 *
 * @noreturn
 *
-* native rg_send_bartime2(const index, const duration, const startPercent, const bool:observer = true);
+* native rg_send_bartime2(const index, const duration, const Float:startPercent, const bool:observer = true);
 */
 cell AMX_NATIVE_CALL rg_send_bartime2(AMX *amx, cell *params)
 {
@@ -2033,15 +2046,16 @@ cell AMX_NATIVE_CALL rg_send_bartime2(AMX *amx, cell *params)
 	CHECK_CONNECTED(pPlayer, arg_index);
 
 	CAmxArgs args(amx, params);
+	float startPercent = args[arg_start_percent];
 	if (!args[arg_observer]) {
 		EMESSAGE_BEGIN(MSG_ONE_UNRELIABLE, gmsgBarTime2, nullptr, pPlayer->edict());
 			EWRITE_SHORT(args[arg_time]);
-			EWRITE_SHORT(args[arg_start_percent]);
+			EWRITE_SHORT(startPercent);
 		EMESSAGE_END();
 		return TRUE;
 	}
 
-	pPlayer->CSPlayer()->SetProgressBarTime2(args[arg_time], args[arg_start_percent]);
+	pPlayer->CSPlayer()->SetProgressBarTime2(args[arg_time], startPercent);
 	return TRUE;
 }
 
@@ -2227,6 +2241,136 @@ cell AMX_NATIVE_CALL rg_get_iteminfo(AMX *amx, cell *params)
 		}
 
 		setAmxString(dest, pItem->m_ItemInfo.pszName, length);
+		break;
+	}
+	default:
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "Unknown ItemInfo type %d", type);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+/**
+* Sets a parameter of the global CBasePlayerItem::m_ItemInfoArray array
+* @note To have effect on client side (i.g. ammo size on HUD) you should
+*       alter this value BEFORE WeaponList message is sent to client, or
+*		force it's alteration by sending again to the specific client.
+*		Hooking WeaponList message with AMXX's register_message is a choice.
+*
+* @param weapon_id Weapon id, see WEAPON_* constants
+* @param type      Item info type. See ItemInfo constants.
+*
+* native rg_set_global_iteminfo(const {WeaponIdType,_}:weapon_id, ItemInfo:type, any:...);
+*/
+cell AMX_NATIVE_CALL rg_set_global_iteminfo(AMX *amx, cell *params)
+{
+	enum args_e { arg_count, arg_weapon_id, arg_type, arg_value };
+
+	WeaponIdType weaponId = static_cast<WeaponIdType>(params[arg_weapon_id]);
+	if (!GetWeaponInfoRange(weaponId, false))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid weapon id %i", __FUNCTION__, weaponId);
+		return FALSE;
+	}
+
+	ItemInfo* II = g_ReGameApi->GetItemInfo(weaponId);
+
+	char itembuf[256];
+	cell *ptr = getAmxAddr(amx, params[arg_value]);
+
+	ItemInfo_e type = static_cast<ItemInfo_e>(params[arg_type]);
+	switch (type)
+	{
+	case ItemInfo_iSlot:     II->iSlot     = *ptr; break;
+	case ItemInfo_iPosition: II->iPosition = *ptr; break;
+	case ItemInfo_iMaxAmmo1: II->iMaxAmmo1 = *ptr; break;
+	case ItemInfo_iMaxAmmo2: II->iMaxAmmo2 = *ptr; break;
+	case ItemInfo_iMaxClip:  II->iMaxClip  = *ptr; break;
+	case ItemInfo_iId:       II->iId       = *ptr; break;
+	case ItemInfo_iFlags:    II->iFlags    = *ptr; break;
+	case ItemInfo_iWeight:   II->iWeight   = *ptr; break;
+	case ItemInfo_pszAmmo1:  II->pszAmmo1  = STRING(getAmxStringAlloc(amx, params[arg_value], itembuf)); break;
+	case ItemInfo_pszAmmo2:  II->pszAmmo2  = STRING(getAmxStringAlloc(amx, params[arg_value], itembuf)); break;
+	case ItemInfo_pszName:   II->pszName   = STRING(getAmxStringAlloc(amx, params[arg_value], itembuf)); break;
+
+	default:
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "Unknown ItemInfo type %d", type);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+/**
+* Gets a parameter of the global CBasePlayerItem::m_ItemInfoArray array
+*
+* @param weapon_id Weapon id, see WEAPON_* constants
+* @param type      Item info type. See ItemInfo constants.
+*
+* native rg_get_global_iteminfo(const {WeaponIdType,_}:weapon_id, ItemInfo:type, any:...);
+*/
+cell AMX_NATIVE_CALL rg_get_global_iteminfo(AMX *amx, cell *params)
+{
+	enum args_e { arg_count, arg_weapon_id, arg_type, arg_output, arg_length };
+
+	WeaponIdType weaponId = static_cast<WeaponIdType>(params[arg_weapon_id]);
+	if (!GetWeaponInfoRange(weaponId, false))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid weapon id %i", __FUNCTION__, weaponId);
+		return FALSE;
+	}
+
+	ItemInfo_e type = static_cast<ItemInfo_e>(params[arg_type]);
+	if ((type == ItemInfo_pszAmmo1 || type == ItemInfo_pszAmmo2 || type == ItemInfo_pszName) && PARAMS_COUNT != 4)
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "Bad arg count. Expected %d, got %d.", 4, PARAMS_COUNT);
+		return FALSE;
+	}
+
+	ItemInfo* II = g_ReGameApi->GetItemInfo(weaponId);
+
+	cell *dest = getAmxAddr(amx, params[arg_output]);
+	size_t length = (PARAMS_COUNT == 4) ? *getAmxAddr(amx, params[arg_length]) : 0;
+
+	switch (type)
+	{
+	case ItemInfo_iSlot:     return II->iSlot;
+	case ItemInfo_iPosition: return II->iPosition;
+	case ItemInfo_iMaxAmmo1: return II->iMaxAmmo1;
+	case ItemInfo_iMaxAmmo2: return II->iMaxAmmo2;
+	case ItemInfo_iMaxClip:  return II->iMaxClip;
+	case ItemInfo_iId:       return II->iId;
+	case ItemInfo_iFlags:    return II->iFlags;
+	case ItemInfo_iWeight:   return II->iWeight;
+	case ItemInfo_pszAmmo1:
+	{
+		if (II->pszAmmo1 == nullptr) {
+			setAmxString(dest, "", 1);
+			break;
+		}
+
+		setAmxString(dest, II->pszAmmo1, length);
+		break;
+	}
+	case ItemInfo_pszAmmo2:
+	{
+		if (II->pszAmmo2 == nullptr) {
+			setAmxString(dest, "", 1);
+			break;
+		}
+
+		setAmxString(dest, II->pszAmmo2, length);
+		break;
+	}
+	case ItemInfo_pszName:
+	{
+		if (II->pszName == nullptr) {
+			setAmxString(dest, "", 1);
+			break;
+		}
+
+		setAmxString(dest, II->pszName, length);
 		break;
 	}
 	default:
@@ -2468,6 +2612,617 @@ cell AMX_NATIVE_CALL rg_spawn_random_gibs(AMX* amx, cell* params)
 	return TRUE;
 }
 
+/*
+* Spawn a grenade (HEGrenade, Flashbang, SmokeGrenade, or C4)
+*
+* @param weaponId              WEAPON_HEGRENADE, WEAPON_SMOKEGRENADE, WEAPON_FLASHBANG or WEAPON_C4
+* @param pevOwner              Grenade owner
+* @param vecSrc                Grenade spawn position
+* @param vecThrow              Grenade velocity vector
+* @param time                  Grenade explosion time
+* @param iTeam                 Grenade team, see TEAM_* constants
+* @param usEvent               Event index related to grenade (returned value of precache_event)
+*
+* @return                      Entity index on success, AMX_NULLENT (-1) otherwise
+*/
+cell AMX_NATIVE_CALL rg_spawn_grenade(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_weapon_id, arg_index, arg_origin, arg_velocity, arg_time, arg_team, arg_event };
+
+	CHECK_ISPLAYER(arg_index);
+
+	CBasePlayer *pPlayer = UTIL_PlayerByIndex(params[arg_index]);
+	CHECK_CONNECTED(pPlayer, arg_index);
+
+	CAmxArgs args(amx, params);
+
+	CGrenade *pBomb = g_ReGameFuncs->SpawnGrenade(args[arg_weapon_id],
+						pPlayer->pev, 
+						args[arg_origin], 
+						args[arg_velocity], 
+						args[arg_time], 
+						args[arg_team], 
+						args[arg_event]);
+
+	// Sanity check anyway
+	if (pBomb)
+		return indexOfPDataAmx(pBomb);
+
+	return AMX_NULLENT;
+}
+
+/*
+* Spawn a weaponbox entity with its properties
+*
+* @param pItem                 Weapon entity index to attach
+* @param pPlayerOwner          Player index to remove pItem entity (0 = no weapon owner)
+* @param modelName             Model name ("models/w_*.mdl")
+* @param origin                Weaponbox origin position
+* @param angles                Weaponbox angles
+* @param velocity              Weaponbox initial velocity vector
+* @param lifeTime              Time to stay in world (< 0.0 = use mp_item_staytime cvar value)
+* @param packAmmo              Set if ammo should be removed from weapon owner
+*
+* @return                      Weaponbox ent index on success, AMX_NULLENT (-1) otherwise
+*/
+cell AMX_NATIVE_CALL rg_create_weaponbox(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_item, arg_player, arg_modelname, arg_origin, arg_angles, arg_velocity, arg_lifetime, arg_packammo };
+
+	CHECK_ISENTITY(arg_item);
+
+	CBasePlayerItem *pItem = getPrivate<CBasePlayerItem>(params[arg_item]);
+	if (unlikely(pItem == nullptr))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized entity", __FUNCTION__);
+		return FALSE;
+	}
+	
+	CBasePlayer *pPlayer = nullptr;
+
+	if (params[arg_player] != 0)
+	{
+		CHECK_ISPLAYER(arg_player);
+
+		pPlayer = getPrivate<CBasePlayer>(params[arg_player]);
+		CHECK_CONNECTED(pPlayer, arg_player);
+	}
+
+	CAmxArgs args(amx, params);
+
+	char modelStr[MAX_PATH];
+	const char *modelName = getAmxString(amx, params[arg_modelname], modelStr);
+	CWeaponBox *pBox = g_ReGameFuncs->CreateWeaponBox(pItem, pPlayer, modelName, args[arg_origin], args[arg_angles], args[arg_velocity], args[arg_lifetime], args[arg_packammo]);
+
+	if (pBox)
+		return indexOfPDataAmx(pBox);
+
+	return AMX_NULLENT;
+}
+
+/*
+* Removes an entity using gamedll's UTIL_Remove function, which sets a frame delay to ensure its removal.
+*
+* @param pEntity               Entity index to remove
+*
+* @return                      1 on success, 0 otherwise
+*/
+cell AMX_NATIVE_CALL rg_remove_entity(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_entity };
+
+	CHECK_ISENTITY(arg_entity);
+
+	auto pEntity = getPrivate<CBaseEntity>(params[arg_entity]);
+	if (!pEntity || (pEntity->pev->flags & FL_KILLME) != 0)
+	{
+		return FALSE;
+	}
+
+	g_ReGameFuncs->UTIL_Remove(pEntity);
+
+	if ((pEntity->pev->flags & FL_KILLME) != 0)
+	{
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+/*
+* Creates a Decal in world based on a traceresult.
+*
+* @param ptr                   Traceresult pointer, use Fakemeta's create_tr2 to instantiate one
+* @param decalNumber           Number of decal to spray, see DECAL_ constants on cssdk_const.inc
+*
+* @noreturn
+*/
+cell AMX_NATIVE_CALL rg_decal_trace(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_trace, arg_decal };
+
+	CAmxArgs args(amx, params);
+	g_ReGameFuncs->UTIL_DecalTrace(args[arg_trace], args[arg_decal]);
+	return TRUE;
+}
+
+/*
+* Emits a sound based on a traceresult simulating a bullet hit (metal, wood, concrete, etc.).
+* @note Used mostly on trace attacks (bullets, knife).
+*
+* @param ptr                   Traceresult pointer, use Fakemeta's create_tr2 to instantiate one
+* @param vecSrc                Start position
+* @param vecEnd                End position, must match ptr's vecEndPos member
+* @param iBulletType           Bullet type, see BULLET_* constants in cssdk_const.inc
+*
+* @noreturn
+*/
+cell AMX_NATIVE_CALL rg_emit_texture_sound(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_trace, arg_start, arg_end, arg_bullet_type };
+
+	CAmxArgs args(amx, params);
+	g_ReGameFuncs->TextureTypePlaySound(args[arg_trace], args[arg_start], args[arg_end], args[arg_bullet_type]);
+	return TRUE;
+}
+
+/*
+* Generates an ammo slot in game's logic
+* @note To see a visual effect, WeaponList message should be sent using the custom ammo name,
+*       where ammo icon HUD will be the one listed in "sprites/weapon_<name>.txt" file.
+*
+* @param szAmmoname            Ammo name to create. 
+*
+* @note Maximum ammo index is 31, after that every ammo instantiation will start from 1 overriding existing ones.
+* @return                      New ammo index. If name already exists, will return the matched index from memory.
+*/
+cell AMX_NATIVE_CALL rg_add_ammo_registry(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_ammoname };
+
+	char ammonamebuf[190];
+	string_t ammoname = getAmxStringAlloc(amx, params[arg_ammoname], ammonamebuf);
+
+	if (!ammonamebuf || ammonamebuf[0] == '\0')
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: empty ammo name", __FUNCTION__);
+		return FALSE;
+	}
+
+	return (cell)g_ReGameFuncs->AddAmmoNameToAmmoRegistry(STRING(ammoname));
+}
+
+/*
+* Deploys a weapon attached to a player using the CBasePlayerWeapon::DefaultDeploy function.
+*
+* @param entity                Weapon to deploy. Must be attached to a player.
+* @param szViewModel           Weapon view model name ("models/v_*.mdl")
+* @param szWeaponModel         Weapon world model bame ("models/p_*.mdl")
+* @param iAnim                 Weapon view model animation to play (often "deploy", use HLMV to see anim index)
+* @param szAnimExt             Player anim extension name to assign. Examples: "carbine", "shotgun", "knife", etc. 
+*                              Use HLMV on a player model to see animext names.
+* @param skiplocal             If 0, weapon animation will be forced to play on client ignoring active client prediction.
+*
+* @return                      1 on successful weapon deploy, 0 otherwise.
+*/
+cell AMX_NATIVE_CALL rg_weapon_deploy(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_weapon, arg_viewmodel, arg_weaponmodel, arg_anim, arg_animextension, arg_skiplocal };
+
+	CHECK_ISENTITY(arg_weapon);
+	CBasePlayerWeapon *pWeapon = getPrivate<CBasePlayerWeapon>(params[arg_weapon]);
+
+	if (unlikely(pWeapon == nullptr))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized entity", __FUNCTION__);
+		return FALSE;
+	}
+
+	if (!pWeapon->IsWeapon())
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: #%d entity is not a weapon.", __FUNCTION__, indexOfEdict(pWeapon->pev));
+		return FALSE;
+	}
+
+	CCSPlayerWeapon *pCSWeapon = pWeapon->CSPlayerWeapon();
+	if (unlikely(pCSWeapon == nullptr))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized m_pEntity.", __FUNCTION__);
+		return FALSE;
+	}
+
+	char viewmodelbuffer[MAX_PATH], weaponmodelbuffer[MAX_PATH], animextbuffer[32];
+	getAmxString(amx, params[arg_viewmodel], viewmodelbuffer);
+	getAmxString(amx, params[arg_weaponmodel], weaponmodelbuffer);
+	getAmxString(amx, params[arg_animextension], animextbuffer);
+
+	return pCSWeapon->DefaultDeploy(viewmodelbuffer, weaponmodelbuffer, (int)params[arg_anim], animextbuffer, (int)params[arg_skiplocal]) ? TRUE : FALSE;
+}
+
+/*
+* Reloads a weapon or a player's active weapon using the CBasePlayerWeapon::DefaultReload function.
+*
+* @param entity                Weapon to reload (> MaxPlayers) OR player index to reload his current active weapon (>= 1 & <= MaxPlayers).
+* @param iClipSize             Weapon max clip to check. 0 = weapon max clip stored in ItemInfo
+* @param iAnim                 Weapon view model animation to play (often "reload", use HLMV to see anim index)
+* @param fDelay                Player reload duration before clip refill.
+*
+* @return                      1 on successful weapon reload, 0 otherwise.
+*/
+cell AMX_NATIVE_CALL rg_weapon_reload(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_weapon, arg_clipsize, arg_anim, arg_delay };
+
+	CBasePlayerWeapon *pWeapon;
+
+	if (params[arg_weapon] > 0 && params[arg_weapon] <= gpGlobals->maxClients)
+	{
+		CHECK_ISPLAYER(arg_weapon);
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex(params[arg_weapon]);
+		CHECK_CONNECTED(pPlayer, arg_weapon);
+
+		if (!pPlayer->IsAlive())
+		{
+			AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: player %d not alive", __FUNCTION__, params[arg_weapon]);
+			return FALSE;
+		}
+
+		pWeapon = static_cast<CBasePlayerWeapon *>(pPlayer->m_pActiveItem);
+	}
+	else
+	{
+		CHECK_ISENTITY(arg_weapon);	
+
+		pWeapon = getPrivate<CBasePlayerWeapon>(params[arg_weapon]);
+	}
+
+	if (unlikely(pWeapon == nullptr))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized entity", __FUNCTION__);
+		return FALSE;
+	}
+
+	if (!pWeapon->IsWeapon())
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: #%d entity is not a weapon.", __FUNCTION__, indexOfEdict(pWeapon->pev));
+		return FALSE;
+	}
+
+	CCSPlayerWeapon *pCSWeapon = pWeapon->CSPlayerWeapon();
+	if (unlikely(pCSWeapon == nullptr))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized m_pEntity.", __FUNCTION__);
+		return FALSE;
+	}
+
+	CAmxArgs args(amx, params);
+
+	int clipsize = args[arg_clipsize];
+
+	if (clipsize <= 0)
+		clipsize = pWeapon->CSPlayerItem()->m_ItemInfo.iMaxClip;
+
+	return pCSWeapon->DefaultReload(clipsize, args[arg_anim], args[arg_delay]) ? TRUE : FALSE;
+}
+
+/*
+* Forces shotgun reload thinking on a weapon or a player's active weapon using the CBasePlayerWeapon::DefaultShotgunReload function.
+*
+* @param entity                Weapon to reload (> MaxClients) OR player index to reload his current active weapon (>= 1 & <= MaxClients).
+* @param iAnim                 Weapon view model "insert" animation to play (use HLMV to see anim index)
+* @param iStartAnim            Weapon view model "start reload" animation to play (use HLMV to see anim index)
+* @param fDelay                Delay between each buckshot inserted
+* @param fStartDelay           Delay before buckshots insertion starts
+* @param pszReloadSound1       Sound to play on every insertion
+* @param pszReloadSound2       Another sound to play on every insertion
+*
+* @note This is used inside weapon's Reload function and is often called every frame player is pressing IN_RELOAD button.
+* @return                      1 while weapon not in delay and with ammo remaining to load, 0 otherwise.
+*/
+cell AMX_NATIVE_CALL rg_weapon_shotgun_reload(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_weapon, arg_anim, arg_startanim, arg_delay, arg_startdelay, arg_reloadsound1, arg_reloadsound2 };
+
+	CBasePlayerWeapon *pWeapon;
+
+	if (params[arg_weapon] > 0 && params[arg_weapon] <= gpGlobals->maxClients)
+	{
+		CHECK_ISPLAYER(arg_weapon);
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex(params[arg_weapon]);
+		CHECK_CONNECTED(pPlayer, arg_weapon);
+
+		if (!pPlayer->IsAlive())
+		{
+			AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: player %d not alive", __FUNCTION__, params[arg_weapon]);
+			return FALSE;
+		}
+
+		pWeapon = static_cast<CBasePlayerWeapon *>(pPlayer->m_pActiveItem);
+	}
+	else
+	{
+		CHECK_ISENTITY(arg_weapon);	
+
+		pWeapon = getPrivate<CBasePlayerWeapon>(params[arg_weapon]);
+	}
+
+	if (unlikely(pWeapon == nullptr))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized entity", __FUNCTION__);
+		return FALSE;
+	}
+
+	if (!pWeapon->IsWeapon())
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: #%d entity is not a weapon.", __FUNCTION__, indexOfEdict(pWeapon->pev));
+		return FALSE;
+	}
+
+	CCSPlayerWeapon *pCSWeapon = pWeapon->CSPlayerWeapon();
+	if (unlikely(pCSWeapon == nullptr))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized m_pEntity.", __FUNCTION__);
+		return FALSE;
+	}
+
+	CAmxArgs args(amx, params);
+
+	char sound1buffer[MAX_PATH], sound2buffer[MAX_PATH];
+	const char *reloadsound1 = getAmxString(amx, params[arg_reloadsound1], sound1buffer);
+	const char *reloadsound2 = getAmxString(amx, params[arg_reloadsound2], sound2buffer);
+
+	return pCSWeapon->DefaultShotgunReload(args[arg_anim], args[arg_startanim], args[arg_delay], args[arg_startdelay], reloadsound1, reloadsound2) ? TRUE : FALSE;
+}
+
+/*
+* Sends a weapon animation using the CBasePlayerWeapon::SendWeaponAnim function.
+*
+* @param entity                Weapon to send animation on owner (> MaxClients) OR player index to send animation (>= 1 & <= MaxClients).
+* @param iAnim                 Weapon view model animation to play (use HLMV to see anim index)
+* @param skiplocal             If 0, weapon animation will be forced to play on client ignoring active client prediction.
+*
+* @noreturn
+*/
+cell AMX_NATIVE_CALL rg_weapon_send_animation(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_weapon, arg_anim, arg_skiplocal };
+
+	CBasePlayerWeapon *pWeapon;
+
+	if (params[arg_weapon] > 0 && params[arg_weapon] <= gpGlobals->maxClients)
+	{
+		CHECK_ISPLAYER(arg_weapon);
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex(params[arg_weapon]);
+		CHECK_CONNECTED(pPlayer, arg_weapon);
+
+		if (!pPlayer->IsAlive())
+		{
+			AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: player %d not alive", __FUNCTION__, params[arg_weapon]);
+			return FALSE;
+		}
+
+		pWeapon = static_cast<CBasePlayerWeapon *>(pPlayer->m_pActiveItem);
+	}
+	else
+	{
+		CHECK_ISENTITY(arg_weapon);	
+
+		pWeapon = getPrivate<CBasePlayerWeapon>(params[arg_weapon]);
+	}
+
+	if (unlikely(pWeapon == nullptr))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized entity", __FUNCTION__);
+		return FALSE;
+	}
+
+	if (!pWeapon->IsWeapon())
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: #%d entity is not a weapon.", __FUNCTION__, indexOfEdict(pWeapon->pev));
+		return FALSE;
+	}
+
+	CCSPlayerWeapon *pCSWeapon = pWeapon->CSPlayerWeapon();
+	if (unlikely(pCSWeapon == nullptr))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized m_pEntity.", __FUNCTION__);
+		return FALSE;
+	}
+
+	CAmxArgs args(amx, params);
+
+	pCSWeapon->SendWeaponAnim(args[arg_anim], args[arg_skiplocal]);
+	return TRUE;
+}
+
+/*
+* Emits a "recoil" effect on weapon's player using the CBasePlayerWeapon::KickBack function.
+*
+* @param entity                Weapon to reload (> MaxClients) OR player index to reload his current active weapon (>= 1 & <= MaxClients).
+* @param up_base               Minimum vertical punchangle
+* @param lateral_base          Minimum horizontal punchangle
+* @param up_modifier           Vertical punchangle units to multiply to m_iShotsFired member
+* @param lateral_modifier      Horizontal punchangle units to multiply to m_iShotsFired member
+* @param up_max                Maximum vertical punchangle
+* @param lateral_max           Maximum horizontal punchangle
+* @param direction_change      Probability to change punchangle orientation (positive or negative). 0 = 100% (1/1), 1 = 50% (1/2), 2 = 33.3% (1/3), ...
+*
+* @noreturn
+*/
+cell AMX_NATIVE_CALL rg_weapon_kickback(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_weapon, arg_up_base, arg_lateral_base, arg_up_modifier, arg_lateral_modifier, arg_up_max, arg_lateral_max, arg_direction_change };
+
+	CBasePlayerWeapon *pWeapon;
+
+	if (params[arg_weapon] > 0 && params[arg_weapon] <= gpGlobals->maxClients)
+	{
+		CHECK_ISPLAYER(arg_weapon);
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex(params[arg_weapon]);
+		CHECK_CONNECTED(pPlayer, arg_weapon);
+
+		if (!pPlayer->IsAlive())
+		{
+			AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: player %d not alive", __FUNCTION__, params[arg_weapon]);
+			return FALSE;
+		}
+
+		pWeapon = static_cast<CBasePlayerWeapon *>(pPlayer->m_pActiveItem);
+	}
+	else
+	{
+		CHECK_ISENTITY(arg_weapon);	
+
+		pWeapon = getPrivate<CBasePlayerWeapon>(params[arg_weapon]);
+	}
+
+	if (unlikely(pWeapon == nullptr)) {
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized entity", __FUNCTION__);
+		return FALSE;
+	}
+
+	if (!pWeapon->IsWeapon())
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: #%d entity is not a weapon.", __FUNCTION__, indexOfEdict(pWeapon->pev));
+		return FALSE;
+	}
+
+	CCSPlayerWeapon *pCSWeapon = pWeapon->CSPlayerWeapon();
+	if (unlikely(pCSWeapon == nullptr))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized m_pEntity.", __FUNCTION__);
+		return FALSE;
+	}
+
+	CAmxArgs args(amx, params);
+
+	pCSWeapon->KickBack(args[arg_up_base], args[arg_lateral_base], args[arg_up_modifier], args[arg_lateral_modifier], args[arg_up_max], args[arg_lateral_max], args[arg_direction_change]);
+	return TRUE;
+}
+
+/*
+* Switches player current weapon into the best one on its inventory using the CHalfLifeMultiplay::GetNextBestWeapon function.
+*
+* @param player                Player index.
+* @param currentWeapon         Current player active weapon. 0 = retrieve from m_pActiveItem member
+*
+* @note Weapon selection is based on weapon's Weight attribute from ItemInfo structure.
+* @return                      1 if weapon was found and switched to, 0 otherwise
+*/
+cell AMX_NATIVE_CALL rg_switch_best_weapon(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_index, arg_weapon };
+
+	CHECK_GAMERULES();
+
+	CHECK_ISPLAYER(arg_index);
+
+	CBasePlayer *pPlayer = UTIL_PlayerByIndex(params[arg_index]);
+	CHECK_CONNECTED(pPlayer, arg_index);
+
+	if (!pPlayer->IsAlive())
+		return FALSE;
+
+	CBasePlayerWeapon *pWeapon;
+
+	if (params[arg_weapon] != 0)
+	{
+		CHECK_ISENTITY(arg_weapon);
+
+		pWeapon = getPrivate<CBasePlayerWeapon>(params[arg_weapon]);
+
+		if (unlikely(pWeapon == nullptr)) {
+			AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: invalid or uninitialized entity", __FUNCTION__);
+			return FALSE;
+		}
+
+		if (!pWeapon->IsWeapon()) {
+			AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: #%d entity is not a weapon.", __FUNCTION__, indexOfEdict(pWeapon->pev));
+			return FALSE;
+		}
+	}
+	else
+	{
+		pWeapon = static_cast<CBasePlayerWeapon *>(pPlayer->m_pActiveItem);
+
+		if (unlikely(pWeapon == nullptr)) {
+			AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: player %d has invalid m_pActiveItem", __FUNCTION__, params[arg_index]);
+			return FALSE;
+		}
+	}
+
+	return CSGameRules()->GetNextBestWeapon(pPlayer, pWeapon);
+}
+
+/*
+* Disappear a player from the world. Used when VIP reaches escape zone. Basically a silent kill.
+*
+* @param player                Player index.
+*
+* @noreturn
+*/
+cell AMX_NATIVE_CALL rg_disappear(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_index };
+
+	CHECK_ISPLAYER(arg_index)
+
+	CBasePlayer *pPlayer = UTIL_PlayerByIndex(params[arg_index]);
+	CHECK_CONNECTED(pPlayer, arg_index);
+
+	pPlayer->CSPlayer()->Disappear();
+	return TRUE;
+}
+
+/*
+* Sets player current Observer mode. 
+* @note Player must be a valid observer (m_afPhysicsFlags & PFLAG_OBSERVER).
+*
+* @param player                Player index.
+* @param mode                  Observer mode, see OBS_* constants in cssdk_const.inc
+*
+* @noreturn
+*/
+cell AMX_NATIVE_CALL rg_set_observer_mode(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_index, arg_mode };
+
+	CHECK_ISPLAYER(arg_index)
+
+	CBasePlayer *pPlayer = UTIL_PlayerByIndex(params[arg_index]);
+	CHECK_CONNECTED(pPlayer, arg_index);
+
+	pPlayer->CSPlayer()->Observer_SetMode((int)params[arg_mode]);
+	return TRUE;
+}
+
+/*
+* Emits a death notice (logs, DeathMsg event, win conditions check)
+*
+* @param pVictim               Player index.
+* @param pKiller               Killer entity.
+* @param pevInflictor          Inflictor entity. 0 = world
+*
+* @noreturn
+*/
+cell AMX_NATIVE_CALL rg_death_notice(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_victim, arg_killer, arg_inflictor };
+
+	CHECK_GAMERULES();
+
+	CHECK_ISPLAYER(arg_victim)
+
+	CBasePlayer *pPlayer = UTIL_PlayerByIndex(params[arg_victim]);
+	CHECK_CONNECTED(pPlayer, arg_victim);
+
+	CHECK_ISENTITY(arg_killer)
+
+	CAmxArgs args(amx, params);
+	CSGameRules()->DeathNotice(pPlayer, args[arg_killer], args[arg_inflictor]);
+	return TRUE;
+}
+
 AMX_NATIVE_INFO Misc_Natives_RG[] =
 {
 	{ "rg_set_animation",             rg_set_animation             },
@@ -2548,6 +3303,8 @@ AMX_NATIVE_INFO Misc_Natives_RG[] =
 
 	{ "rg_set_iteminfo",              rg_set_iteminfo              },
 	{ "rg_get_iteminfo",              rg_get_iteminfo              },
+	{ "rg_set_global_iteminfo",       rg_set_global_iteminfo       },
+	{ "rg_get_global_iteminfo",       rg_get_global_iteminfo       },
 
 	{ "rg_hint_message",              rg_hint_message              },
 
@@ -2561,6 +3318,22 @@ AMX_NATIVE_INFO Misc_Natives_RG[] =
 
 	{ "rg_spawn_head_gib",            rg_spawn_head_gib            },
 	{ "rg_spawn_random_gibs",         rg_spawn_random_gibs         },
+
+	{ "rg_spawn_grenade",             rg_spawn_grenade             },
+	{ "rg_create_weaponbox",          rg_create_weaponbox          },
+	{ "rg_remove_entity",             rg_remove_entity             },
+	{ "rg_decal_trace",               rg_decal_trace               },
+	{ "rg_emit_texture_sound",        rg_emit_texture_sound        },
+	{ "rg_add_ammo_registry",         rg_add_ammo_registry         },
+	{ "rg_weapon_deploy",             rg_weapon_deploy             },
+	{ "rg_weapon_reload",             rg_weapon_reload             },
+	{ "rg_weapon_shotgun_reload",     rg_weapon_shotgun_reload     },
+	{ "rg_weapon_send_animation",     rg_weapon_send_animation     },
+	{ "rg_weapon_kickback",           rg_weapon_kickback           },
+	{ "rg_switch_best_weapon",        rg_switch_best_weapon        },
+	{ "rg_disappear",                 rg_disappear                 },
+	{ "rg_set_observer_mode",         rg_set_observer_mode         },
+	{ "rg_death_notice",              rg_death_notice              },
 
 	{ nullptr, nullptr }
 };
@@ -2728,7 +3501,7 @@ cell AMX_NATIVE_CALL rh_drop_client(AMX *amx, cell *params)
 *
 * @param output     Buffer to copy the ip address
 * @param len        Maximum buffer size
-* 
+*
 * @noreturn
 *
 * native rh_get_net_from(output[], len);
@@ -2738,11 +3511,36 @@ cell AMX_NATIVE_CALL rh_get_net_from(AMX* amx, cell* params)
 	enum args_e { arg_count, arg_output, arg_maxlen };
 
 	cell *dest = getAmxAddr(amx, params[arg_output]);
-	char *addr = NET_AdrToString(*g_RehldsData->GetNetFrom());
+	const char *addr = NET_AdrToString(*g_RehldsData->GetNetFrom());
 
 	setAmxString(dest, addr, params[arg_maxlen]);
-	
+
 	return TRUE;
+}
+
+/*
+* Returns client's netchan playing time in seconds.
+*
+* @param index     Client index
+*
+* @return          Netchan connection time in seconds or 0 if client index is invalid or client is not connected
+*
+* native rh_get_client_connect_time(const index);
+*/
+cell AMX_NATIVE_CALL rh_get_client_connect_time(AMX *amx, cell *params)
+{
+	enum args_e { arg_count, arg_index };
+
+	CHECK_ISPLAYER(arg_index);
+
+	client_t *pClient = clientOfIndex(params[arg_index]);
+	if (unlikely(pClient == nullptr || !(pClient->active | pClient->spawned | pClient->connected)))
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: player %i is not connected", __FUNCTION__, params[arg_index]);
+		return FALSE;
+	}
+
+	return (cell)(g_RehldsFuncs->GetRealTime() - pClient->netchan.connect_time);
 }
 
 AMX_NATIVE_INFO Misc_Natives_RH[] =
@@ -2754,6 +3552,8 @@ AMX_NATIVE_INFO Misc_Natives_RH[] =
 	{ "rh_update_user_info", rh_update_user_info },
 	{ "rh_drop_client",      rh_drop_client      },
 	{ "rh_get_net_from",     rh_get_net_from     },
+
+	{ "rh_get_client_connect_time", rh_get_client_connect_time },
 
 	{ nullptr, nullptr }
 };
