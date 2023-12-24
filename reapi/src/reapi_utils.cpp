@@ -97,7 +97,7 @@ CBaseEntity *GiveNamedItemInternal(AMX *amx, CBasePlayer *pPlayer, const char *p
 	return pEntity;
 }
 
-void StudioFrameAdvanceEnt(edict_t *pEdict)
+void StudioFrameAdvanceEnt(studiohdr_t *pstudiohdr, edict_t *pEdict)
 {
 	float flInterval = gpGlobals->time - pEdict->v.animtime;
 	if (flInterval <= 0.001f) {
@@ -109,10 +109,8 @@ void StudioFrameAdvanceEnt(edict_t *pEdict)
 		flInterval = 0.0f;
 	}
 
-	studiohdr_t *pstudiohdr = static_cast<studiohdr_t *>(GET_MODEL_PTR(pEdict));
-	if (!pstudiohdr) {
+	if (!pstudiohdr)
 		return;
-	}
 
 	if (pEdict->v.sequence >= pstudiohdr->numseq || pEdict->v.sequence < 0) {
 		return;
@@ -160,14 +158,25 @@ void GetBonePosition(CBaseEntity *pEntity, int iBone, Vector *pVecOrigin, Vector
 	Vector vecOrigin, vecAngles;
 	edict_t *pEdict = pEntity->edict();
 
+	if (pVecOrigin) *pVecOrigin = Vector(0, 0, 0);
+	if (pVecAngles) *pVecAngles = Vector(0, 0, 0);
+
+	studiohdr_t *pstudiohdr = static_cast<studiohdr_t *>(GET_MODEL_PTR(pEdict));
+	if (!pstudiohdr)
+		return;
+
+	if (iBone < 0 || iBone >= pstudiohdr->numbones)
+		return; // invalid bone
+
 	// force to update frame
-	StudioFrameAdvanceEnt(pEdict);
+	StudioFrameAdvanceEnt(pstudiohdr, pEdict);
 
 	pEntity->pev->angles.x = -pEntity->pev->angles.x;
 	GET_BONE_POSITION(pEdict, iBone, vecOrigin, vecAngles);
 	pEntity->pev->angles.x = -pEntity->pev->angles.x;
 
-	if (!pEntity->IsPlayer()) {
+	// ReGameDLL already have fixes angles for non-players entities
+	if (!g_ReGameApi && !pEntity->IsPlayer()) {
 		FixupAngles(pEdict, vecOrigin);
 	}
 
@@ -180,17 +189,28 @@ void GetBonePosition(CBaseEntity *pEntity, int iBone, Vector *pVecOrigin, Vector
 	}
 }
 
-void GetAttachment(CBaseEntity *pEntity, int iBone, Vector *pVecOrigin, Vector *pVecAngles)
+void GetAttachment(CBaseEntity *pEntity, int iAttachment, Vector *pVecOrigin, Vector *pVecAngles)
 {
 	Vector vecOrigin, vecAngles;
 	edict_t *pEdict = pEntity->edict();
 
+	if (pVecOrigin) *pVecOrigin = Vector(0, 0, 0);
+	if (pVecAngles) *pVecAngles = Vector(0, 0, 0);
+
+	studiohdr_t *pstudiohdr = static_cast<studiohdr_t *>(GET_MODEL_PTR(pEdict));
+	if (!pstudiohdr)
+		return;
+
+	if (iAttachment < 0 || iAttachment >= pstudiohdr->numattachments)
+		return; // invalid attachment
+
 	// force to update frame
-	StudioFrameAdvanceEnt(pEdict);
+	StudioFrameAdvanceEnt(pstudiohdr, pEdict);
 
-	GET_ATTACHMENT(pEdict, iBone, vecOrigin, vecAngles);
+	GET_ATTACHMENT(pEdict, iAttachment, vecOrigin, vecAngles);
 
-	if (!pEntity->IsPlayer()) {
+	// ReGameDLL already have fixes angles for non-players entities
+	if (!g_ReGameApi && !pEntity->IsPlayer()) {
 		FixupAngles(pEdict, vecOrigin);
 	}
 
@@ -201,6 +221,74 @@ void GetAttachment(CBaseEntity *pEntity, int iBone, Vector *pVecOrigin, Vector *
 	if (pVecAngles) {
 		*pVecAngles = vecAngles;
 	}
+}
+
+void SetBodygroup(CBaseEntity *pEntity, int iGroup, int iValue)
+{
+	studiohdr_t *pstudiohdr = static_cast<studiohdr_t *>(GET_MODEL_PTR(pEntity->edict()));
+	if (!pstudiohdr || iGroup > pstudiohdr->numbodyparts)
+	{
+		return;
+	}
+
+	mstudiobodyparts_t *pbodypart = (mstudiobodyparts_t *)((byte *)pstudiohdr + pstudiohdr->bodypartindex) + iGroup;
+
+	if (iValue >= pbodypart->nummodels)
+	{
+		return;
+	}
+
+	int iCurrent = (pEntity->pev->body / pbodypart->base) % pbodypart->nummodels;
+	pEntity->pev->body += (iValue - iCurrent) * pbodypart->base;
+}
+
+int GetBodygroup(CBaseEntity *pEntity, int iGroup)
+{
+	studiohdr_t *pstudiohdr = static_cast<studiohdr_t *>(GET_MODEL_PTR(pEntity->edict()));
+
+	if (!pstudiohdr || iGroup > pstudiohdr->numbodyparts)
+	{
+		return 0;
+	}
+
+	mstudiobodyparts_t *pbodypart = (mstudiobodyparts_t *)((byte *)pstudiohdr + pstudiohdr->bodypartindex) + iGroup;
+
+	if (pbodypart->nummodels <= 1)
+	{
+		return 0;
+	}
+
+	int iCurrent = (pEntity->pev->body / pbodypart->base) % pbodypart->nummodels;
+	return iCurrent;
+}
+
+bool GetSequenceInfo2(CBaseEntity *pEntity, int *piFlags, float *pflFrameRate, float *pflGroundSpeed)
+{
+	studiohdr_t *pstudiohdr = static_cast<studiohdr_t *>(GET_MODEL_PTR(pEntity->edict()));
+
+	if (!pstudiohdr || pEntity->pev->sequence >= pstudiohdr->numseq)
+	{
+		*piFlags = 0;
+		*pflFrameRate = 0;
+		*pflGroundSpeed = 0;
+		return false;
+	}
+
+	mstudioseqdesc_t *pseqdesc = (mstudioseqdesc_t *)((byte *)pstudiohdr + pstudiohdr->seqindex) + int(pEntity->pev->sequence);
+	*piFlags = pseqdesc->flags;
+	if (pseqdesc->numframes <= 1)
+	{
+		*pflFrameRate = 256.0f;
+		*pflGroundSpeed = 0.0f;
+	}
+	else 
+	{
+		*pflFrameRate = pseqdesc->fps * 256.0f / (pseqdesc->numframes - 1);
+		*pflGroundSpeed = Q_sqrt(pseqdesc->linearmovement[0] * pseqdesc->linearmovement[0] + pseqdesc->linearmovement[1] * pseqdesc->linearmovement[1] + pseqdesc->linearmovement[2] * pseqdesc->linearmovement[2]);
+		*pflGroundSpeed = *pflGroundSpeed * pseqdesc->fps / (pseqdesc->numframes - 1);
+	}
+
+	return true;
 }
 
 void RemoveOrDropItem(CBasePlayer *pPlayer, CBasePlayerItem *pItem, GiveType type)
@@ -232,7 +320,8 @@ const char *getATypeStr(AType type)
 		"ATYPE_EDICT",
 		"ATYPE_EVARS",
 		"ATYPE_BOOL",
-		"ATYPE_VECTOR"
+		"ATYPE_VECTOR",
+		"ATYPE_TRACE"
 	};
 
 	if (type >= arraysize(s_ATypes))
@@ -241,7 +330,7 @@ const char *getATypeStr(AType type)
 	return s_ATypes[type];
 }
 
-char* NET_AdrToString(const netadr_t& a)
+const char *NET_AdrToString(const netadr_t &a, bool onlyBase)
 {
 	static char s[64];
 
@@ -249,8 +338,14 @@ char* NET_AdrToString(const netadr_t& a)
 
 	if (a.type == NA_LOOPBACK)
 		Q_snprintf(s, sizeof(s), "loopback");
+
 	else if (a.type == NA_IP)
-		Q_snprintf(s, sizeof(s), "%i.%i.%i.%i:%i", a.ip[0], a.ip[1], a.ip[2], a.ip[3], ntohs(a.port));
+	{
+		if (onlyBase)
+			Q_snprintf(s, sizeof(s), "%i.%i.%i.%i", a.ip[0], a.ip[1], a.ip[2], a.ip[3]);
+		else
+			Q_snprintf(s, sizeof(s), "%i.%i.%i.%i:%i", a.ip[0], a.ip[1], a.ip[2], a.ip[3], ntohs(a.port));
+	}
 #ifdef _WIN32
 	else // NA_IPX
 		Q_snprintf(s, sizeof(s), "%02x%02x%02x%02x:%02x%02x%02x%02x%02x%02x:%i", a.ipx[0], a.ipx[1], a.ipx[2], a.ipx[3], a.ipx[4], a.ipx[5], a.ipx[6], a.ipx[7], a.ipx[8], a.ipx[9], ntohs(a.port));

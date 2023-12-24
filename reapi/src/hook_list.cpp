@@ -20,6 +20,11 @@ inline size_t getFwdParamType(void(*)(float&))                  { return FP_FLOA
 inline size_t getFwdParamType(void(*)(const char *))            { return FP_STRING; }
 inline size_t getFwdParamType(void(*)(char *))                  { return FP_STRING; }
 inline size_t getFwdParamType(void(*)(IResourceBuffer*))        { return FP_CELL;   }
+inline size_t getFwdParamType(void(*)(unsigned char))           { return FP_CELL;   }
+inline size_t getFwdParamType(void(*)(resourcetype_t))          { return FP_CELL;   }
+inline size_t getFwdParamType(void(*)(cmd_source_t))            { return FP_CELL;   }
+inline size_t getFwdParamType(void(*)(GameEventType))           { return FP_CELL;   }
+inline size_t getFwdParamType(void(*)(float*))                  { return FP_ARRAY;  }
 
 template <typename T>
 inline size_t getFwdParamType(void(*)(T *))                     { return FP_CELL;   }
@@ -94,6 +99,16 @@ hook_t hooklist_engine[] = {
 	ENG(ED_Alloc),
 	ENG(ED_Free),
 	ENG(Con_Printf),
+	ENG(SV_CheckUserInfo, _AMXX),
+	ENG(PF_precache_generic_I),
+	ENG(PF_precache_model_I),
+	ENG(PF_precache_sound_I),
+	ENG(EV_Precache, _AMXX),
+	ENG(SV_AddResource),
+	ENG(SV_ClientPrintf),
+	ENG(SV_AllowPhysent),
+	ENG(ExecuteServerStringCmd),
+
 };
 
 #define DLL(h,...) { {}, {}, #h, "ReGameDLL", [](){ return api_cfg.hasReGameDLL(); }, ((!(RG_##h & (MAX_REGION_RANGE - 1)) ? regfunc::current_cell = 1, true : false) || (RG_##h & (MAX_REGION_RANGE - 1)) == regfunc::current_cell++) ? regfunc(h##__VA_ARGS__) : regfunc(#h#__VA_ARGS__), [](){ g_ReGameHookchains->h()->registerHook(&h); }, [](){ g_ReGameHookchains->h()->unregisterHook(&h); }, false}
@@ -117,6 +132,19 @@ hook_t hooklist_gamedll[] = {
 	DLL(IsPenetrableEntity),
 	DLL(SpawnHeadGib),
 	DLL(SpawnRandomGibs),
+	DLL(CreateWeaponBox),
+	DLL(PM_LadderMove, _AMXX),
+	DLL(PM_WaterJump, _AMXX),
+	DLL(PM_CheckWaterJump, _AMXX),
+	DLL(PM_Jump, _AMXX),
+	DLL(PM_Duck, _AMXX),
+	DLL(PM_UnDuck, _AMXX),
+	DLL(PM_PlayStepSound, _AMXX),
+	DLL(PM_AirAccelerate, _AMXX),
+	DLL(ClearMultiDamage),
+	DLL(AddMultiDamage),
+	DLL(ApplyMultiDamage),
+	DLL(BuyItem),
 };
 
 hook_t hooklist_animating[] = {
@@ -181,6 +209,9 @@ hook_t hooklist_player[] = {
 	DLL(CBasePlayer_Pain),
 	DLL(CBasePlayer_DeathSound),
 	DLL(CBasePlayer_JoiningThink),
+
+	DLL(CBasePlayer_CheckTimeBasedDamage),
+	DLL(CBasePlayer_EntSelectSpawnPoint),
 };
 
 hook_t hooklist_gamerules[] = {
@@ -208,6 +239,10 @@ hook_t hooklist_gamerules[] = {
 	DLL(CSGameRules_BalanceTeams),
 	DLL(CSGameRules_OnRoundFreezeEnd),
 	DLL(CSGameRules_CanPlayerHearPlayer),
+	DLL(CSGameRules_Think),
+	DLL(CSGameRules_TeamFull),
+	DLL(CSGameRules_TeamStacked),
+	DLL(CSGameRules_PlayerGotWeapon),
 };
 
 hook_t hooklist_grenade[] = {
@@ -228,6 +263,9 @@ hook_t hooklist_weapon[] = {
 	DLL(CBasePlayerWeapon_DefaultDeploy),
 	DLL(CBasePlayerWeapon_DefaultReload),
 	DLL(CBasePlayerWeapon_DefaultShotgunReload),
+	DLL(CBasePlayerWeapon_ItemPostFrame),
+	DLL(CBasePlayerWeapon_KickBack),
+	DLL(CBasePlayerWeapon_SendWeaponAnim),
 };
 
 hook_t hooklist_gib[] = {
@@ -240,6 +278,10 @@ hook_t hooklist_cbaseentity[] = {
 	DLL(CBaseEntity_FireBullets),
 	DLL(CBaseEntity_FireBuckshots),
 	DLL(CBaseEntity_FireBullets3),
+};
+
+hook_t hooklist_botmanager[] = {
+	DLL(CBotManager_OnEvent),
 };
 
 #define RCHECK(h,...) { {}, {}, #h, "ReChecker", [](){ return api_cfg.hasRechecker(); }, ((!(RC_##h & (MAX_REGION_RANGE - 1)) ? regfunc::current_cell = 1, true : false) || (RC_##h & (MAX_REGION_RANGE - 1)) == regfunc::current_cell++) ? regfunc(h##__VA_ARGS__) : regfunc(#h#__VA_ARGS__), [](){ g_RecheckerHookchains->h()->registerHook(&h); }, [](){ g_RecheckerHookchains->h()->unregisterHook(&h); }, false}
@@ -268,6 +310,7 @@ hook_t* hooklist_t::getHookSafe(size_t hook)
 		CASE(weapon)
 		CASE(gib)
 		CASE(cbaseentity)
+		CASE(botmanager)
 	}
 
 	return nullptr;
@@ -288,6 +331,7 @@ void hooklist_t::clear()
 	FOREACH_CLEAR(weapon);
 	FOREACH_CLEAR(gib);
 	FOREACH_CLEAR(cbaseentity);
+	FOREACH_CLEAR(botmanager);
 }
 
 void hook_t::clear()

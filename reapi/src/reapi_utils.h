@@ -53,12 +53,15 @@ ModelName GetModelAuto(TeamName team);
 void UTIL_ServerPrint(const char *fmt, ...);
 CBaseEntity *GiveNamedItemInternal(AMX *amx, CBasePlayer *pPlayer, const char *pszItemName, const size_t uid = 0);
 
-void GetBonePosition(CBaseEntity *pEntity, int iBone, Vector *vecOrigin, Vector *vecAngles);
-void GetAttachment(CBaseEntity *pEntity, int iBone, Vector *pVecOrigin, Vector *pVecAngles);
+void GetBonePosition(CBaseEntity *pEntity, int iBone, Vector *pVecOrigin, Vector *pVecAngles);
+void GetAttachment(CBaseEntity *pEntity, int iAttachment, Vector *pVecOrigin, Vector *pVecAngles);
+void SetBodygroup(CBaseEntity *pEntity, int iGroup, int iValue);
+int GetBodygroup(CBaseEntity *pEntity, int iGroup);
+bool GetSequenceInfo2(CBaseEntity *pEntity, int *piFlags, float *pflFrameRate, float *pflGroundSpeed);
 void RemoveOrDropItem(CBasePlayer *pPlayer, CBasePlayerItem *pItem, GiveType type);
 
 const char *getATypeStr(AType type);
 
-char *NET_AdrToString(const netadr_t& a);
+const char *NET_AdrToString(const netadr_t &a, bool onlyBase = false);
 
 extern void NORETURN UTIL_SysError(const char *fmt, ...);

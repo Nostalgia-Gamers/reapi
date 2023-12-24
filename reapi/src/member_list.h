@@ -83,6 +83,8 @@ struct memberlist_t
 		mt_mapinfo,
 		mt_csplayerweapon,
 		mt_gib,
+		mt_netadr,
+		mt_csentity
 	};
 };
 
@@ -96,6 +98,41 @@ struct member_t
 	const char *name;
 	MType type;
 	bool (*pfnIsRefsToClass)(void *pEntity);
+
+	inline static const char *getTypeString(MType memberType)
+	{
+		switch (memberType)
+		{
+		case MEMBER_FLOAT:       return "Float";
+		case MEMBER_DOUBLE:      return "Double";
+		case MEMBER_ENTITY:      return "Entity";
+		case MEMBER_CLASSPTR:    return "ClassPtr";
+		case MEMBER_EHANDLE:     return "EHANDLE";
+		case MEMBER_EVARS:       return "entvars";
+		case MEMBER_EDICT:       return "edict";
+		case MEMBER_VECTOR:      return "Vector";
+		case MEMBER_STRING:      return "String";
+		case MEMBER_QSTRING:     return "QStirng";
+		case MEMBER_INTEGER:     return "Integer";
+		case MEMBER_SHORT:       return "Short";
+		case MEMBER_BYTE:        return "Byte";
+		case MEMBER_BOOL:        return "Bool";
+		case MEMBER_SIGNALS:     return "Signals";
+		case MEBMER_REBUYSTRUCT: return "RebuyStruct";
+		case MEMBER_PMTRACE:     return "pmtrace";
+		case MEBMER_USERCMD:     return "usercmd";
+		case MEMBER_TRACERESULT: return "TraceResult";
+		default:
+		{
+			static char string[16];
+			Q_snprintf(string, sizeof(string), "%d", memberType);
+			return string;
+		}
+		}
+
+		return ""; // shut up compiler
+	}
+
 };
 
 inline bool member_t::isTypeReturnable() const
@@ -735,6 +772,13 @@ enum PMTrace
 	pmt_hitgroup
 };
 
+enum NetAdr
+{
+	netadr_type = BEGIN_MEMBER_REGION(netadr),
+	netadr_ip,
+	netadr_port
+};
+
 // CCSPlayer
 enum CSPlayer_Members
 {
@@ -749,6 +793,14 @@ enum CSPlayer_Members
 	m_bGameForcingRespawn,
 	m_bAutoBunnyHopping,
 	m_bMegaBunnyJumping,
+	m_bPlantC4Anywhere,
+	m_bSpawnProtectionEffects,
+	m_flJumpHeight,
+	m_flLongJumpHeight,
+	m_flLongJumpForce,
+	m_flDuckSpeedMultiplier,
+	m_iNumKilledByUnanswered,
+	m_bPlayerDominated,
 };
 
 enum CBasePlayerItem_Members
@@ -1023,6 +1075,7 @@ enum CKnife_Members
 	m_Knife_flSwingBaseDamage_Fast,
 	m_Knife_flStabDistance,
 	m_Knife_flSwingDistance,
+	m_Knife_flBackStabMultiplier,
 };
 
 enum CP90_Members
@@ -1060,7 +1113,7 @@ enum MapInfo_Members
 
 enum CSPlayerWeapon_Members
 {
-	m_Weapon_bHasSecondaryAttack = BEGIN_MEMBER_REGION(csplayerweapon),
+	m_Weapon_iStateSecondaryAttack = BEGIN_MEMBER_REGION(csplayerweapon),
 	m_Weapon_flBaseDamage,
 };
 
@@ -1070,4 +1123,10 @@ enum CGib_Members
 	m_Gib_cBloodDecals,
 	m_Gib_material,
 	m_Gib_lifeTime,
+};
+
+enum CSEntity_Members
+{
+	m_ucDmgPenetrationLevel = BEGIN_MEMBER_REGION(csentity),
+	m_pevLastInflictor,
 };

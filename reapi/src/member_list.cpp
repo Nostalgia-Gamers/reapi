@@ -30,6 +30,7 @@
 #define MOVEVAR_MEMBERS(mx)      STRUCT_MEMBERS(movevars_t, mx, mv_##mx)
 #define UCMD_MEMBERS(mx)         STRUCT_MEMBERS(usercmd_s, mx, ucmd_##mx)
 #define PMTRACE_MEMBERS(mx)      STRUCT_MEMBERS(pmtrace_s, mx, pmt_##mx)
+#define NETADR_MEMBERS(mx)       STRUCT_MEMBERS(netadr_t, mx, netadr_##mx)
 #define CSPL_MEMBERS(mx)         CLASS_MEMBERS(CCSPlayer, mx, mx)
 #define BASEITEM_MEMBERS(mx)     CLASS_MEMBERS(CBasePlayerItem, mx, mx)
 #define BASEWPN_MEMBERS(mx)      CLASS_MEMBERS_PREF(CBasePlayerWeapon, mx, m_Weapon_##mx, m_)
@@ -69,6 +70,7 @@
 #define MAPINFO_MEMBERS(mx)      CLASS_MEMBERS_PREF(CMapInfo, mx, m_MapInfo_##mx, m_)
 #define CSPLWPN_MEMBERS(mx)      CLASS_MEMBERS_PREF(CCSPlayerWeapon, mx, m_Weapon_##mx, m_)
 #define GIB_MEMBERS(mx)          CLASS_MEMBERS_PREF(CGib, mx, m_Gib_##mx, m_)
+#define CSENT_MEMBERS(mx)        CLASS_MEMBERS(CCSEntity, mx, mx)
 
 inline MType getMemberType(float*)              { return MEMBER_FLOAT; }
 inline MType getMemberType(float)               { return MEMBER_FLOAT; }
@@ -111,6 +113,8 @@ inline MType getMemberType(MONSTERSTATE)        { return MEMBER_INTEGER; }
 inline MType getMemberType(ArmorType)           { return MEMBER_INTEGER; }
 inline MType getMemberType(ArmouryItemPack)     { return MEMBER_INTEGER; }
 inline MType getMemberType(InfoMapBuyParam)     { return MEMBER_INTEGER; }
+inline MType getMemberType(SecondaryAtkState)   { return MEMBER_INTEGER; }
+inline MType getMemberType(netadrtype_t)        { return MEMBER_INTEGER; }
 
 inline MType getMemberType(TraceResult)         { return MEMBER_TRACERESULT; }
 
@@ -118,6 +122,7 @@ inline MType getMemberType(short)               { return MEMBER_SHORT; }
 inline MType getMemberType(unsigned short)      { return MEMBER_SHORT; }
 
 inline MType getMemberType(bool)                { return MEMBER_BOOL; }
+inline MType getMemberType(bool*)               { return MEMBER_BOOL; }
 inline MType getMemberType(CUnifiedSignals)     { return MEMBER_SIGNALS; }
 inline MType getMemberType(RebuyStruct)         { return MEBMER_REBUYSTRUCT; }
 
@@ -760,6 +765,14 @@ member_t memberlist_csplayer[] = {
 	CSPL_MEMBERS(m_bGameForcingRespawn),
 	CSPL_MEMBERS(m_bAutoBunnyHopping),
 	CSPL_MEMBERS(m_bMegaBunnyJumping),
+	CSPL_MEMBERS(m_bPlantC4Anywhere),
+	CSPL_MEMBERS(m_bSpawnProtectionEffects),
+	CSPL_MEMBERS(m_flJumpHeight),
+	CSPL_MEMBERS(m_flLongJumpHeight),
+	CSPL_MEMBERS(m_flLongJumpForce),
+	CSPL_MEMBERS(m_flDuckSpeedMultiplier),
+	CSPL_MEMBERS(m_iNumKilledByUnanswered),
+	CSPL_MEMBERS(m_bPlayerDominated),
 };
 
 member_t memberlist_baseitem[] = {
@@ -1002,6 +1015,7 @@ member_t memberlist_knife[] = {
 	KNIFE_MEMBERS(flSwingBaseDamage_Fast),
 	KNIFE_MEMBERS(flStabDistance),
 	KNIFE_MEMBERS(flSwingDistance),
+	KNIFE_MEMBERS(flBackStabMultiplier),
 };
 
 member_t memberlist_p90[] = {
@@ -1034,7 +1048,7 @@ member_t memberlist_mapinfo[] = {
 };
 
 member_t memberlist_csplayerweapon[] = {
-	CSPLWPN_MEMBERS(bHasSecondaryAttack),
+	CSPLWPN_MEMBERS(iStateSecondaryAttack),
 	CSPLWPN_MEMBERS(flBaseDamage),
 };
 
@@ -1043,6 +1057,17 @@ member_t memberlist_gib[] = {
 	GIB_MEMBERS(cBloodDecals),
 	GIB_MEMBERS(material),
 	GIB_MEMBERS(lifeTime),
+};
+
+member_t memberlist_netadr[] = {
+	NETADR_MEMBERS(type),
+	NETADR_MEMBERS(ip),
+	NETADR_MEMBERS(port)
+};
+
+member_t memberlist_csentity[] = {
+	CSENT_MEMBERS(m_ucDmgPenetrationLevel),
+	CSENT_MEMBERS(m_pevLastInflictor),
 };
 
 #ifdef __GNUC__
@@ -1108,6 +1133,8 @@ member_t *memberlist_t::operator[](size_t members) const
 		CASE(mapinfo)
 		CASE(csplayerweapon)
 		CASE(gib)
+		CASE(netadr)
+		CASE(csentity)
 	}
 
 	#undef CASE
