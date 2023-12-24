@@ -4812,6 +4812,14 @@ enum CCSPlayer_Members
 
 	/*
 	* Description:      -
+	* Member type:      int
+	* Get params:       get_member(index, member);
+	* Set params:       set_member(index, member, bool:value);
+	*/
+	m_iAliveNameChanges,
+
+	/*
+	* Description:      -
 	* Member type:      bool
 	* Get params:       get_member(index, member);
 	* Set params:       set_member(index, member, bool:value);

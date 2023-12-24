@@ -55,8 +55,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <NMakeBuildCommandLine>ECHO Setup version from Git revision
 IF EXIST "$(ProjectDir)..\..\version\appversion.bat" (CALL "$(ProjectDir)..\..\version\appversion.bat" "$(ProjectDir)..\..\version\" "$(SolutionDir)..\" "reapi_version.inc")</NMakeBuildCommandLine>
-    <NMakeOutput>
-    </NMakeOutput>
+    <NMakeOutput />
     <NMakePreprocessorDefinitions>WIN32;_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <NMakeCleanCommandLine>echo ON
 

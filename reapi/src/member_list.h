@@ -794,6 +794,7 @@ enum CSPlayer_Members
 	m_bAutoBunnyHopping,
 	m_bMegaBunnyJumping,
 	m_bPlantC4Anywhere,
+	m_iAliveNameChanges,
 	m_bSpawnProtectionEffects,
 	m_flJumpHeight,
 	m_flLongJumpHeight,
