@@ -2792,6 +2792,29 @@ cell AMX_NATIVE_CALL rg_add_ammo_registry(AMX* amx, cell* params)
 	return (cell)g_ReGameFuncs->AddAmmoNameToAmmoRegistry(STRING(ammoname));
 }
 
+/**
+* Removes an ammo slot in game's logic
+*
+* @param szAmmoname				Ammo name to delete.
+*
+* @return						1 on success, 0 otherwise
+*/
+cell AMX_NATIVE_CALL rg_remove_ammo_registry(AMX* amx, cell* params)
+{
+	enum args_e { arg_count, arg_ammoname };
+
+	char ammonamebuf[190];
+	string_t ammoname = getAmxStringAlloc(amx, params[arg_ammoname], ammonamebuf);
+
+	if (!ammonamebuf || ammonamebuf[0] == '\0')
+	{
+		AMXX_LogError(amx, AMX_ERR_NATIVE, "%s: empty ammo name", __FUNCTION__);
+		return FALSE;
+	}
+
+	return g_ReGameFuncs->RemoveAmmoNameFromAmmoRegistry(STRING(ammoname));
+}
+
 /*
 * Deploys a weapon attached to a player using the CBasePlayerWeapon::DefaultDeploy function.
 *
@@ -3325,6 +3348,7 @@ AMX_NATIVE_INFO Misc_Natives_RG[] =
 	{ "rg_decal_trace",               rg_decal_trace               },
 	{ "rg_emit_texture_sound",        rg_emit_texture_sound        },
 	{ "rg_add_ammo_registry",         rg_add_ammo_registry         },
+	{ "rg_remove_ammo_registry",      rg_remove_ammo_registry      },
 	{ "rg_weapon_deploy",             rg_weapon_deploy             },
 	{ "rg_weapon_reload",             rg_weapon_reload             },
 	{ "rg_weapon_shotgun_reload",     rg_weapon_shotgun_reload     },

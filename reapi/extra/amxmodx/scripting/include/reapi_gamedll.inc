@@ -1084,6 +1084,15 @@ native rg_emit_texture_sound(const ptr, Float:vecSrc[3], Float:vecEnd[3], Bullet
 */
 native rg_add_ammo_registry(const szAmmoname[]);
 
+/**
+* Removes an ammo slot in game's logic
+*
+* @param szAmmoname				Ammo name to delete.
+*
+* @return						1 on success, 0 otherwise
+*/
+native rg_remove_ammo_registry(const szAmmoname[]);
+
 /*
 * Deploys a weapon attached to a player using the CBasePlayerWeapon::DefaultDeploy function.
 *

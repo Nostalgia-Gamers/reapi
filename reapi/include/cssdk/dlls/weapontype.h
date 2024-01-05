@@ -412,6 +412,18 @@ struct WeaponInfoStruct
 	const char *ammoName2;
 };
 
+struct AmmoInfoStruct
+{
+	AmmoType ammoType;
+
+	int clipCost;
+	int buyClipSize;
+	int maxRounds;
+
+	const char* ammoName1;
+	const char* ammoName2;
+};
+
 struct WeaponSlotInfo
 {
 	WeaponIdType id;
