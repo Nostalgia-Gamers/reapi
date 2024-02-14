@@ -1460,7 +1460,7 @@ void PM_LadderMove_AMXX(IReGameHook_PM_LadderMove *chain, physent_t *pLadder, in
 
 void PM_LadderMove(IReGameHook_PM_LadderMove *chain, physent_t *pLadder)
 {
-	PM_LadderMove_AMXX(chain, pLadder, pLadder->player + 1);
+	PM_LadderMove_AMXX(chain, pLadder, g_pMove->player_index + 1);
 }
 
 void PM_WaterJump_AMXX(IReGameHook_PM_WaterJump *chain, int playerIndex)
@@ -1710,6 +1710,25 @@ void CBasePlayerWeapon_SendWeaponAnim(IReGameHook_CBasePlayerWeapon_SendWeaponAn
 	callVoidForward(RG_CBasePlayerWeapon_SendWeaponAnim, original, indexOfEdict(pthis->pev), iAnim, skiplocal);
 }
 
+void CBasePlayer_PlayerDeathThink(IReGameHook_CBasePlayer_PlayerDeathThink *chain, CBasePlayer *pthis)
+{
+	auto original = [chain](int _pthis)
+	{
+		chain->callNext(getPrivate<CBasePlayer>(_pthis));
+	};
+
+	callVoidForward(RG_CBasePlayer_PlayerDeathThink, original, indexOfEdict(pthis->pev));
+}
+
+void CBasePlayer_Observer_Think(IReGameHook_CBasePlayer_Observer_Think *chain, CBasePlayer *pthis)
+{
+	auto original = [chain](int _pthis)
+	{
+		chain->callNext(getPrivate<CBasePlayer>(_pthis));
+	};
+
+	callVoidForward(RG_CBasePlayer_Observer_Think, original, indexOfEdict(pthis->pev));
+}
 
 /*
 * VTC functions

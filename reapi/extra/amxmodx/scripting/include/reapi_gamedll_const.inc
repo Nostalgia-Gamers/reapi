@@ -134,7 +134,15 @@ enum WpnInfo
 	* Get params:       rg_get_weapon_info(const weapon_id, WI_NAME, const output[], maxlenght);
 	* Set params:       -
 	*/
-	WI_NAME
+	WI_NAME,
+
+	/*
+	* Description:      -
+	* Return type:      enum InventorySlotType
+	* Get params:       rg_get_weapon_info(const weapon_id, WI_SLOT);
+	* Set params:       rg_set_weapon_info(const weapon_id, WI_SLOT, const value);
+	*/
+	WI_SLOT,
 };
 
 /**
@@ -914,6 +922,18 @@ enum GamedllFunc_CBasePlayer
 	* Params:           (const this)
 	*/
 	RG_CBasePlayer_EntSelectSpawnPoint,
+
+	/*
+	* Description:      -
+	* Params:           (const this)
+	*/
+	RG_CBasePlayer_PlayerDeathThink,
+
+	/*
+	* Description:      -
+	* Params:           (const this)
+	*/
+	RG_CBasePlayer_Observer_Think,
 };
 
 /**
