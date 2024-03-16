@@ -13,6 +13,15 @@ enum MapNameType
 	MNT_SET     // return the name of the current map
 };
 
+/**
+* For native CheckVisibilityInOrigin
+*/
+enum CheckVisibilityType
+{
+	VisibilityInPVS = 0, // Check in Potentially Visible Set (PVS)
+	VisibilityInPAS      // Check in Potentially Audible Set (PAS)
+};
+
 /*
 * For RH_SV_AddResource hook
 */
@@ -163,17 +172,17 @@ enum EngineFunc
 	RH_SV_ClientPrintf,
 
 	/*
-	* Description:  Called when a command is being sent to server.
-	* Params:       (const cmd[], source, id)
-	*/
-	RH_ExecuteServerStringCmd,
-
-	/*
 	* Description:  Called before adding an entity to the physents of a player.
 	* Return type:  bool
 	* Params:       (const entity, const client)
 	*/
 	RH_SV_AllowPhysent,
+
+	/*
+	* Description:  Called when a command is being sent to server.
+	* Params:       (const cmd[], source, id)
+	*/
+	RH_ExecuteServerStringCmd,
 
 };
 
