@@ -1214,3 +1214,22 @@ native rg_death_notice(const pVictim, const pKiller, const pevInflictor);
 * @return           Match player relationship, see GR_* constants in cssdk_const.inc
 */
 native rg_player_relationship(const player, const target);
+
+/*
+* Removes spawn protection from a player
+*
+* @param player     Player index
+*
+* @noreturn
+*/
+native rg_remove_spawn_protection(const player);
+
+/*
+* Sets spawn protection for a player with given time
+*
+* @param player     Player index
+* @param time		Protection time
+* 
+* @noreturn
+*/
+native rg_set_spawn_protection(const player, const Float:time);

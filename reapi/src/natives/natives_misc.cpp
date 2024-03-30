@@ -3316,6 +3316,46 @@ cell AMX_NATIVE_CALL rg_player_relationship(AMX *amx, cell *params)
 	return CSGameRules()->PlayerRelationship(pPlayer, pTarget);
 }
 
+
+/*
+* Removes spawn protection from a player
+*
+* @param player     Player index
+*
+* @noreturn
+*/
+cell AMX_NATIVE_CALL rg_remove_spawn_protection(AMX* amx, cell* params) {
+	enum args_e { arg_count, arg_player };
+
+	CHECK_ISPLAYER(arg_player);
+
+	CBasePlayer* pPlayer = UTIL_PlayerByIndex(params[arg_player]);
+	CHECK_CONNECTED(pPlayer, arg_player);
+
+	pPlayer->CSPlayer()->RemoveSpawnProtection();
+	return TRUE;
+}
+
+/*
+* Sets spawn protection for a player with given time
+*
+* @param player     Player index
+* @param time		Protection time
+* 
+* @noreturn
+*/
+cell AMX_NATIVE_CALL rg_set_spawn_protection(AMX* amx, cell* params) {
+	enum args_e { arg_count, arg_player, arg_time };
+
+	CHECK_ISPLAYER(arg_player);
+
+	CBasePlayer* pPlayer = UTIL_PlayerByIndex(params[arg_player]);
+	CHECK_CONNECTED(pPlayer, arg_player);
+
+	pPlayer->CSPlayer()->SetSpawnProtection(params[arg_time]);
+	return TRUE;
+}
+
 AMX_NATIVE_INFO Misc_Natives_RG[] =
 {
 	{ "rg_set_animation",             rg_set_animation             },
@@ -3429,6 +3469,8 @@ AMX_NATIVE_INFO Misc_Natives_RG[] =
 	{ "rg_set_observer_mode",         rg_set_observer_mode         },
 	{ "rg_death_notice",              rg_death_notice              },
 	{ "rg_player_relationship",       rg_player_relationship       },
+	{ "rg_remove_spawn_protection",   rg_remove_spawn_protection   },
+	{ "rg_set_spawn_protection",      rg_set_spawn_protection      },
 
 	{ nullptr, nullptr }
 };
