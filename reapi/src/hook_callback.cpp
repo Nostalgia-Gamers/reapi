@@ -175,9 +175,9 @@ int PF_precache_generic_I(IRehldsHook_PF_precache_generic_I *chain, const char *
 	return callForward<int>(RH_PF_precache_generic_I, original, s);
 }
 
-int PF_precache_model_I(IRehldsHook_PF_precache_model_I *chain, char *s)
+int PF_precache_model_I(IRehldsHook_PF_precache_model_I *chain, const char *s)
 {
-	auto original = [chain](char *_s)
+	auto original = [chain](const char *_s)
 	{
 		return chain->callNext(_s);
 	};
@@ -240,6 +240,22 @@ void ExecuteServerStringCmd(IRehldsHook_ExecuteServerStringCmd* chain, const cha
 	};
 
 	callVoidForward(RH_ExecuteServerStringCmd, original, cmdName, cmdSrc, cmdSrc == src_client ? cl->GetId() + 1 : AMX_NULLENT);
+}
+
+void SV_SendResources_AMXX(SV_SendResources_t *data, IGameClient *cl)
+{
+	auto original = [data](int _cl)
+	{
+		data->m_chain->callNext(data->m_args);
+	};
+
+	callVoidForward(RH_SV_SendResources, original, cl ? cl->GetId() + 1 : AMX_NULLENT);
+}
+
+void SV_SendResources(IRehldsHook_SV_SendResources *chain, sizebuf_t *msg)
+{
+	SV_SendResources_t data(chain, msg);
+	SV_SendResources_AMXX(&data, g_RehldsFuncs->GetHostClient());
 }
 
 /*
@@ -1728,6 +1744,26 @@ void CBasePlayer_Observer_Think(IReGameHook_CBasePlayer_Observer_Think *chain, C
 	};
 
 	callVoidForward(RG_CBasePlayer_Observer_Think, original, indexOfEdict(pthis->pev));
+}
+
+void CBasePlayer_RemoveAllItems(IReGameHook_CBasePlayer_RemoveAllItems *chain, CBasePlayer *pthis, BOOL removeSuit)
+{
+	auto original = [chain](int _pthis, BOOL _removeSuit)
+	{
+		chain->callNext(getPrivate<CBasePlayer>(_pthis), _removeSuit);
+	};
+
+	callVoidForward(RG_CBasePlayer_RemoveAllItems, original, indexOfEdict(pthis->pev), removeSuit);
+}
+
+void CSGameRules_SendDeathMessage(IReGameHook_CSGameRules_SendDeathMessage *chain, CBaseEntity *pKiller, CBasePlayer *pVictim, CBasePlayer *pAssister, entvars_t *pevInflictor, const char *killerWeaponName, int iDeathMessageFlags, int iRarityOfKill)
+{
+	auto original = [chain](int _pKiller, int _pVictim, int _pAssister, int _pevInflictor, const char *_killerWeaponName, int _iDeathMessageFlags, int _iRarityOfKill)
+	{
+		chain->callNext(getPrivate<CBaseEntity>(_pKiller), getPrivate<CBasePlayer>(_pVictim), getPrivate<CBasePlayer>(_pAssister), PEV(_pevInflictor), _killerWeaponName, _iDeathMessageFlags, _iRarityOfKill);
+	};
+
+	callVoidForward(RG_CSGameRules_SendDeathMessage, original, indexOfPDataAmx(pKiller), indexOfEdict(pVictim->pev), indexOfPDataAmx(pAssister), indexOfEdictAmx(pevInflictor), killerWeaponName, iDeathMessageFlags, iRarityOfKill);
 }
 
 /*

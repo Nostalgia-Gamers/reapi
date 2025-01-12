@@ -108,7 +108,7 @@ hook_t hooklist_engine[] = {
 	ENG(SV_ClientPrintf),
 	ENG(SV_AllowPhysent),
 	ENG(ExecuteServerStringCmd),
-
+	ENG(SV_SendResources, _AMXX),
 };
 
 #define DLL(h,...) { {}, {}, #h, "ReGameDLL", [](){ return api_cfg.hasReGameDLL(); }, ((!(RG_##h & (MAX_REGION_RANGE - 1)) ? regfunc::current_cell = 1, true : false) || (RG_##h & (MAX_REGION_RANGE - 1)) == regfunc::current_cell++) ? regfunc(h##__VA_ARGS__) : regfunc(#h#__VA_ARGS__), [](){ g_ReGameHookchains->h()->registerHook(&h); }, [](){ g_ReGameHookchains->h()->unregisterHook(&h); }, false}
@@ -215,6 +215,7 @@ hook_t hooklist_player[] = {
 
 	DLL(CBasePlayer_PlayerDeathThink),
 	DLL(CBasePlayer_Observer_Think),
+	DLL(CBasePlayer_RemoveAllItems),
 };
 
 hook_t hooklist_gamerules[] = {
@@ -246,6 +247,7 @@ hook_t hooklist_gamerules[] = {
 	DLL(CSGameRules_TeamFull),
 	DLL(CSGameRules_TeamStacked),
 	DLL(CSGameRules_PlayerGotWeapon),
+	DLL(CSGameRules_SendDeathMessage),
 };
 
 hook_t hooklist_grenade[] = {

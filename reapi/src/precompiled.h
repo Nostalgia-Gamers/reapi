@@ -1,11 +1,10 @@
 #pragma once
 
 // C
-#include <string.h>
+#include <string.h>			// for strncpy(), etc
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>			// for strncpy(), etc
 
 // C++
 #include <vector>				// std::vector
@@ -46,7 +45,7 @@
 #include <reunion_api.h>
 #include "mod_reunion_api.h"
 
-// regamedll API
+// rechecker API
 #include <rechecker_api.h>
 #include "mod_rechecker_api.h"
 
@@ -60,12 +59,14 @@
 #include "main.h"
 #include "api_config.h"
 #include "hook_manager.h"
+#include "hook_message_manager.h"
 #include "hook_callback.h"
 #include "entity_callback_dispatcher.h"
 #include "member_list.h"
 
 // natives
 #include "natives_hookchains.h"
+#include "natives_hookmessage.h"
 #include "natives_members.h"
 #include "natives_misc.h"
 #include "natives_common.h"

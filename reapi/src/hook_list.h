@@ -117,6 +117,7 @@ enum EngineFunc
 	RH_SV_ClientPrintf,
 	RH_SV_AllowPhysent,
 	RH_ExecuteServerStringCmd,
+	RH_SV_SendResources,
 
 	// [...]
 };
@@ -238,6 +239,7 @@ enum GamedllFunc_CBasePlayer
 
 	RG_CBasePlayer_PlayerDeathThink,
 	RG_CBasePlayer_Observer_Think,
+	RG_CBasePlayer_RemoveAllItems,
 
 	// [...]
 };
@@ -305,6 +307,7 @@ enum GamedllFunc_CSGameRules
 	RG_CSGameRules_TeamFull,
 	RG_CSGameRules_TeamStacked,
 	RG_CSGameRules_PlayerGotWeapon,
+	RG_CSGameRules_SendDeathMessage,
 
 	// [...]
 };
